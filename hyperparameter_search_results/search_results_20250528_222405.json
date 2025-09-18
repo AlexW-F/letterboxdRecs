@@ -1,0 +1,845 @@
+{
+  "KNNBasic": {
+    "best_params": {
+      "sim_options": {
+        "name": "pearson",
+        "user_based": false
+      },
+      "k": 75
+    },
+    "best_val_rmse": 0.7208405587306469,
+    "total_iterations": 10,
+    "search_history": [
+      {
+        "iteration": 1,
+        "params": {
+          "sim_options": {
+            "name": "pearson",
+            "user_based": false
+          },
+          "k": 75
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0050449371337890625
+      },
+      {
+        "iteration": 2,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 10
+        },
+        "train_rmse": 0.6630524422424351,
+        "train_mae": 0.4443556926697326,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.057788116488211805,
+        "train_time": 0.0032739639282226562
+      },
+      {
+        "iteration": 3,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 40
+        },
+        "train_rmse": 0.5997379248562897,
+        "train_mae": 0.39950076601939155,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.12110263387435716,
+        "train_time": 0.004949092864990234
+      },
+      {
+        "iteration": 4,
+        "params": {
+          "sim_options": {
+            "name": "pearson",
+            "user_based": true
+          },
+          "k": 65
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0003809928894042969
+      },
+      {
+        "iteration": 5,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 15
+        },
+        "train_rmse": 0.6419016374279641,
+        "train_mae": 0.4302391646995602,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.07893892130268276,
+        "train_time": 0.0032351016998291016
+      },
+      {
+        "iteration": 6,
+        "params": {
+          "sim_options": {
+            "name": "pearson",
+            "user_based": true
+          },
+          "k": 45
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.00036406517028808594
+      },
+      {
+        "iteration": 7,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 65
+        },
+        "train_rmse": 0.5777426034158919,
+        "train_mae": 0.379569291823834,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.143097955314755,
+        "train_time": 0.005911111831665039
+      },
+      {
+        "iteration": 8,
+        "params": {
+          "sim_options": {
+            "name": "cosine",
+            "user_based": false
+          },
+          "k": 65
+        },
+        "train_rmse": 0.5609673616974213,
+        "train_mae": 0.34405641025641026,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.15987319703322556,
+        "train_time": 0.005045890808105469
+      },
+      {
+        "iteration": 9,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": true
+          },
+          "k": 45
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0003769397735595703
+      },
+      {
+        "iteration": 10,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": true
+          },
+          "k": 15
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0003521442413330078
+      }
+    ]
+  },
+  "KNNWithMeans": {
+    "best_params": {
+      "sim_options": {
+        "name": "pearson",
+        "user_based": false
+      },
+      "k": 75
+    },
+    "best_val_rmse": 0.7208405587306469,
+    "total_iterations": 10,
+    "search_history": [
+      {
+        "iteration": 1,
+        "params": {
+          "sim_options": {
+            "name": "pearson",
+            "user_based": false
+          },
+          "k": 75
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.005217075347900391
+      },
+      {
+        "iteration": 2,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 10
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.003442049026489258
+      },
+      {
+        "iteration": 3,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 40
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.005445003509521484
+      },
+      {
+        "iteration": 4,
+        "params": {
+          "sim_options": {
+            "name": "pearson",
+            "user_based": true
+          },
+          "k": 65
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0003921985626220703
+      },
+      {
+        "iteration": 5,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 15
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.003740072250366211
+      },
+      {
+        "iteration": 6,
+        "params": {
+          "sim_options": {
+            "name": "pearson",
+            "user_based": true
+          },
+          "k": 45
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0004038810729980469
+      },
+      {
+        "iteration": 7,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 65
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.006860971450805664
+      },
+      {
+        "iteration": 8,
+        "params": {
+          "sim_options": {
+            "name": "cosine",
+            "user_based": false
+          },
+          "k": 65
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.005845069885253906
+      },
+      {
+        "iteration": 9,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": true
+          },
+          "k": 45
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0003910064697265625
+      },
+      {
+        "iteration": 10,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": true
+          },
+          "k": 15
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0003750324249267578
+      }
+    ]
+  },
+  "KNNBaseline": {
+    "best_params": {
+      "sim_options": {
+        "name": "pearson",
+        "user_based": false
+      },
+      "k": 75
+    },
+    "best_val_rmse": 0.7208405587306469,
+    "total_iterations": 10,
+    "search_history": [
+      {
+        "iteration": 1,
+        "params": {
+          "sim_options": {
+            "name": "pearson",
+            "user_based": false
+          },
+          "k": 75
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.005043983459472656
+      },
+      {
+        "iteration": 2,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 10
+        },
+        "train_rmse": 0.6656068853107304,
+        "train_mae": 0.4458203266694539,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.055233673419916474,
+        "train_time": 0.0034689903259277344
+      },
+      {
+        "iteration": 3,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 40
+        },
+        "train_rmse": 0.6059795964219039,
+        "train_mae": 0.4050431206236896,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.11486096230874299,
+        "train_time": 0.006112813949584961
+      },
+      {
+        "iteration": 4,
+        "params": {
+          "sim_options": {
+            "name": "pearson",
+            "user_based": true
+          },
+          "k": 65
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0005807876586914062
+      },
+      {
+        "iteration": 5,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 15
+        },
+        "train_rmse": 0.6459810907630811,
+        "train_mae": 0.43298711942384266,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.07485946796756582,
+        "train_time": 0.004029035568237305
+      },
+      {
+        "iteration": 6,
+        "params": {
+          "sim_options": {
+            "name": "pearson",
+            "user_based": true
+          },
+          "k": 45
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0005381107330322266
+      },
+      {
+        "iteration": 7,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": false
+          },
+          "k": 65
+        },
+        "train_rmse": 0.5840181612202187,
+        "train_mae": 0.38538563838009043,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.13682239751042824,
+        "train_time": 0.007747173309326172
+      },
+      {
+        "iteration": 8,
+        "params": {
+          "sim_options": {
+            "name": "cosine",
+            "user_based": false
+          },
+          "k": 65
+        },
+        "train_rmse": 0.5578012507959964,
+        "train_mae": 0.3469934731934731,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.1630393079346505,
+        "train_time": 0.006803035736083984
+      },
+      {
+        "iteration": 9,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": true
+          },
+          "k": 45
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0005509853363037109
+      },
+      {
+        "iteration": 10,
+        "params": {
+          "sim_options": {
+            "name": "msd",
+            "user_based": true
+          },
+          "k": 15
+        },
+        "train_rmse": 0.6975372019814772,
+        "train_mae": 0.4604666666666667,
+        "val_rmse": 0.7208405587306469,
+        "val_mae": 0.48120000000000007,
+        "overfitting_score": 0.023303356749169724,
+        "train_time": 0.0005199909210205078
+      }
+    ]
+  },
+  "SVD": {
+    "best_params": {
+      "reg_all": 0.01,
+      "n_factors": 100,
+      "n_epochs": 30,
+      "lr_all": 0.01
+    },
+    "best_val_rmse": 0.7196626091561799,
+    "total_iterations": 10,
+    "search_history": [
+      {
+        "iteration": 1,
+        "params": {
+          "reg_all": 0.01,
+          "n_factors": 100,
+          "n_epochs": 30,
+          "lr_all": 0.01
+        },
+        "train_rmse": 0.6285288855958462,
+        "train_mae": 0.42910689749951736,
+        "val_rmse": 0.7196626091561799,
+        "val_mae": 0.4875910912678587,
+        "overfitting_score": 0.09113372356033367,
+        "train_time": 0.0013720989227294922
+      },
+      {
+        "iteration": 2,
+        "params": {
+          "reg_all": 0.05,
+          "n_factors": 200,
+          "n_epochs": 30,
+          "lr_all": 0.001
+        },
+        "train_rmse": 0.5627263326974251,
+        "train_mae": 0.364022104701063,
+        "val_rmse": 0.7203856643234153,
+        "val_mae": 0.48340127765461505,
+        "overfitting_score": 0.15765933162599022,
+        "train_time": 0.0021369457244873047
+      },
+      {
+        "iteration": 3,
+        "params": {
+          "reg_all": 0.1,
+          "n_factors": 200,
+          "n_epochs": 30,
+          "lr_all": 0.01
+        },
+        "train_rmse": 0.57139477859368,
+        "train_mae": 0.3806024411401253,
+        "val_rmse": 0.7202147058199467,
+        "val_mae": 0.4843004267879556,
+        "overfitting_score": 0.1488199272262667,
+        "train_time": 0.0022306442260742188
+      },
+      {
+        "iteration": 4,
+        "params": {
+          "reg_all": 0.005,
+          "n_factors": 50,
+          "n_epochs": 30,
+          "lr_all": 0.002
+        },
+        "train_rmse": 0.558223311451115,
+        "train_mae": 0.3631516694473434,
+        "val_rmse": 0.7199603265860361,
+        "val_mae": 0.4857319127560952,
+        "overfitting_score": 0.1617370151349211,
+        "train_time": 0.0010328292846679688
+      },
+      {
+        "iteration": 5,
+        "params": {
+          "reg_all": 0.1,
+          "n_factors": 20,
+          "n_epochs": 10,
+          "lr_all": 0.002
+        },
+        "train_rmse": 0.5557703709843896,
+        "train_mae": 0.3409190539004245,
+        "val_rmse": 0.7207548000712748,
+        "val_mae": 0.48159655918044314,
+        "overfitting_score": 0.16498442908688515,
+        "train_time": 0.000537872314453125
+      },
+      {
+        "iteration": 6,
+        "params": {
+          "reg_all": 0.1,
+          "n_factors": 150,
+          "n_epochs": 50,
+          "lr_all": 0.01
+        },
+        "train_rmse": 0.5858318854391503,
+        "train_mae": 0.3949725792288628,
+        "val_rmse": 0.7200394865220123,
+        "val_mae": 0.4852730488224393,
+        "overfitting_score": 0.134207601082862,
+        "train_time": 0.0023429393768310547
+      },
+      {
+        "iteration": 7,
+        "params": {
+          "reg_all": 0.02,
+          "n_factors": 20,
+          "n_epochs": 50,
+          "lr_all": 0.01
+        },
+        "train_rmse": 0.6000672165637969,
+        "train_mae": 0.40648332231663215,
+        "val_rmse": 0.7205774251066885,
+        "val_mae": 0.4824426360291734,
+        "overfitting_score": 0.12051020854289163,
+        "train_time": 0.0008540153503417969
+      },
+      {
+        "iteration": 8,
+        "params": {
+          "reg_all": 0.1,
+          "n_factors": 200,
+          "n_epochs": 10,
+          "lr_all": 0.002
+        },
+        "train_rmse": 0.5636062618367058,
+        "train_mae": 0.3585754461190686,
+        "val_rmse": 0.7208418581698133,
+        "val_mae": 0.4811940501356513,
+        "overfitting_score": 0.15723559633310746,
+        "train_time": 0.0012538433074951172
+      },
+      {
+        "iteration": 9,
+        "params": {
+          "reg_all": 0.05,
+          "n_factors": 150,
+          "n_epochs": 30,
+          "lr_all": 0.001
+        },
+        "train_rmse": 0.5612063853716793,
+        "train_mae": 0.3588077846998119,
+        "val_rmse": 0.7208236415597794,
+        "val_mae": 0.481277618220234,
+        "overfitting_score": 0.15961725618810008,
+        "train_time": 0.0017511844635009766
+      },
+      {
+        "iteration": 10,
+        "params": {
+          "reg_all": 0.005,
+          "n_factors": 20,
+          "n_epochs": 30,
+          "lr_all": 0.02
+        },
+        "train_rmse": 0.6592800490318104,
+        "train_mae": 0.4516322276003105,
+        "val_rmse": 0.7202985718410817,
+        "val_mae": 0.48385367011236596,
+        "overfitting_score": 0.061018522809271336,
+        "train_time": 0.0008966922760009766
+      }
+    ]
+  },
+  "SVDpp": {
+    "best_params": {
+      "reg_all": 0.05,
+      "n_factors": 150,
+      "n_epochs": 30,
+      "lr_all": 0.001
+    },
+    "best_val_rmse": 0.7191866422820119,
+    "total_iterations": 10,
+    "search_history": [
+      {
+        "iteration": 1,
+        "params": {
+          "reg_all": 0.01,
+          "n_factors": 100,
+          "n_epochs": 30,
+          "lr_all": 0.01
+        },
+        "train_rmse": 0.6706220538866741,
+        "train_mae": 0.4551401374298906,
+        "val_rmse": 0.7205164611407001,
+        "val_mae": 0.48274214719530717,
+        "overfitting_score": 0.04989440725402605,
+        "train_time": 0.05438494682312012
+      },
+      {
+        "iteration": 2,
+        "params": {
+          "reg_all": 0.05,
+          "n_factors": 200,
+          "n_epochs": 30,
+          "lr_all": 0.001
+        },
+        "train_rmse": 0.5804727351272034,
+        "train_mae": 0.3851537740488126,
+        "val_rmse": 0.7209920509290837,
+        "val_mae": 0.48051758883857754,
+        "overfitting_score": 0.14051931580188026,
+        "train_time": 0.10099506378173828
+      },
+      {
+        "iteration": 3,
+        "params": {
+          "reg_all": 0.1,
+          "n_factors": 200,
+          "n_epochs": 30,
+          "lr_all": 0.01
+        },
+        "train_rmse": 0.5952979299950022,
+        "train_mae": 0.403610202832357,
+        "val_rmse": 0.720850395614571,
+        "val_mae": 0.48115500172766573,
+        "overfitting_score": 0.1255524656195688,
+        "train_time": 0.09901595115661621
+      },
+      {
+        "iteration": 4,
+        "params": {
+          "reg_all": 0.005,
+          "n_factors": 50,
+          "n_epochs": 30,
+          "lr_all": 0.002
+        },
+        "train_rmse": 0.5596906342762203,
+        "train_mae": 0.36546112746491305,
+        "val_rmse": 0.7205824351996989,
+        "val_mae": 0.4824182286788904,
+        "overfitting_score": 0.16089180092347855,
+        "train_time": 0.030002117156982422
+      },
+      {
+        "iteration": 5,
+        "params": {
+          "reg_all": 0.1,
+          "n_factors": 20,
+          "n_epochs": 10,
+          "lr_all": 0.002
+        },
+        "train_rmse": 0.5600007798316754,
+        "train_mae": 0.34986860913890655,
+        "val_rmse": 0.7204079504747374,
+        "val_mae": 0.48328730173091194,
+        "overfitting_score": 0.16040717064306198,
+        "train_time": 0.010765790939331055
+      },
+      {
+        "iteration": 6,
+        "params": {
+          "reg_all": 0.1,
+          "n_factors": 150,
+          "n_epochs": 50,
+          "lr_all": 0.01
+        },
+        "train_rmse": 0.6099462828189126,
+        "train_mae": 0.4142639454761368,
+        "val_rmse": 0.7208897505742746,
+        "val_mae": 0.48097595069337834,
+        "overfitting_score": 0.11094346775536201,
+        "train_time": 0.12762904167175293
+      },
+      {
+        "iteration": 7,
+        "params": {
+          "reg_all": 0.02,
+          "n_factors": 20,
+          "n_epochs": 50,
+          "lr_all": 0.01
+        },
+        "train_rmse": 0.6566886697835457,
+        "train_mae": 0.4452994753770042,
+        "val_rmse": 0.7216588334375416,
+        "val_mae": 0.48200581807786647,
+        "overfitting_score": 0.06497016365399588,
+        "train_time": 0.02958989143371582
+      },
+      {
+        "iteration": 8,
+        "params": {
+          "reg_all": 0.1,
+          "n_factors": 200,
+          "n_epochs": 10,
+          "lr_all": 0.002
+        },
+        "train_rmse": 0.5734175973746145,
+        "train_mae": 0.3751817531990202,
+        "val_rmse": 0.720342607881836,
+        "val_mae": 0.4836235135299306,
+        "overfitting_score": 0.1469250105072215,
+        "train_time": 0.04021191596984863
+      },
+      {
+        "iteration": 9,
+        "params": {
+          "reg_all": 0.05,
+          "n_factors": 150,
+          "n_epochs": 30,
+          "lr_all": 0.001
+        },
+        "train_rmse": 0.5712086241226823,
+        "train_mae": 0.3828547162168659,
+        "val_rmse": 0.7191866422820119,
+        "val_mae": 0.4912320847698803,
+        "overfitting_score": 0.14797801815932965,
+        "train_time": 0.08067035675048828
+      },
+      {
+        "iteration": 10,
+        "params": {
+          "reg_all": 0.005,
+          "n_factors": 20,
+          "n_epochs": 30,
+          "lr_all": 0.02
+        },
+        "train_rmse": 0.6870616058142333,
+        "train_mae": 0.45778119048299687,
+        "val_rmse": 0.7208438480417229,
+        "val_mae": 0.4811849422620467,
+        "overfitting_score": 0.0337822422274896,
+        "train_time": 0.020397186279296875
+      }
+    ]
+  }
+}
