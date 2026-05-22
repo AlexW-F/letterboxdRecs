@@ -1,0 +1,49 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: letterboxd-recs-api
+    environment:
+      MODELS_DIR: /app/models
+      ML_DATA_DIR: /app/ml-32m
+      CONTENT_FEATURES: /app/data/content_features
+      CACHE_DIR: /app/.api_cache
+      SVD_FILE: ${SVD_FILE:-svd_full_slim.pkl}
+      ALS_FILE: ${ALS_FILE:-als_full.pkl}
+      OPENBLAS_NUM_THREADS: "1"
+    volumes:
+      # Read-only mounts for the heavy model + dataset blobs (kept out of the image).
+      - ./models:/app/models:ro
+      - ./ml-32m:/app/ml-32m:ro
+      - ./data:/app/data:ro
+      # Persistent upload cache so re-uploads of identical CSVs are idempotent
+      # across container restarts.
+      - ./.api_cache:/app/.api_cache
+    # No host port mapping — the web service proxies /api/* over the
+    # internal docker network. Uncomment to expose directly:
+    # ports:
+    #   - "8000:8000"
+    expose:
+      - "8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        VITE_TMDB_KEY: ${VITE_TMDB_KEY:-}
+    container_name: letterboxd-recs-web
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped

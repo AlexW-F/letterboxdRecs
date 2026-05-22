@@ -22,15 +22,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /build
 COPY requirements.txt ./
 # Pin numpy<2 because scikit-surprise wheels are built against numpy 1.x.
-RUN pip install --no-cache-dir 'numpy<2' 'pandas<3' 'scipy<1.14' \
- && pip install --no-cache-dir -r requirements.txt \
- && pip install --no-cache-dir implicit diskcache pyarrow
+RUN pip install --no-cache-dir 'numpy<2' 'pandas<3' \
+ && pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     OPENBLAS_NUM_THREADS=1
 WORKDIR /app
+
+# implicit's CPU extension is linked against libgomp (OpenMP).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+ && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=build /usr/local/bin/uvicorn /usr/local/bin/uvicorn
 COPY src /app/src
