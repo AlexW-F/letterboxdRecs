@@ -351,6 +351,7 @@ class Reranker:
         movies_df: pd.DataFrame,
         genre_features: Dict[str, Set[str]],
         content_features: Optional[ContentFeatures] = None,
+        content_features_extra: Optional[List[ContentFeatures]] = None,
     ) -> None:
         if svd_scorer is None and als_scorer is None:
             raise ValueError("At least one of svd_scorer / als_scorer is required")
@@ -358,12 +359,48 @@ class Reranker:
         self.als = als_scorer
         self.popularity = popularity
         self.genre_features = genre_features
-        self.content = content_features
+        # All content scorers as a flat list; primary first if both provided.
+        # Each operates in its own embedding space (e.g. tag genome vs director
+        # one-hot); the reranker averages their per-candidate normalized scores.
+        self.content_scorers: List[ContentFeatures] = []
+        if content_features is not None:
+            self.content_scorers.append(content_features)
+        if content_features_extra:
+            self.content_scorers.extend(content_features_extra)
+        # Back-compat alias for code that still reads .content (e.g. analyze endpoint).
+        self.content = self.content_scorers[0] if self.content_scorers else None
         # Title lookup: movieId -> title
         self.titles: Dict[str, str] = {
             str(mid): title
             for mid, title in zip(movies_df["movieId"].astype(str), movies_df["title"])
         }
+
+    def _content_norms(self, user_ratings: Dict[str, float], candidate_ids) -> Dict[str, float]:
+        """Average per-candidate normalized score across all content scorers
+        that can score the user. Empty scorers / no-overlap users contribute
+        nothing; movies not in any scorer's catalog get the neutral default
+        in the caller (0.5)."""
+        if not self.content_scorers:
+            return {}
+        per_scorer: List[Dict[str, float]] = []
+        for cf in self.content_scorers:
+            taste = cf.taste_vector(user_ratings)
+            if taste is None:
+                continue
+            raw = cf.score(taste, candidate_ids)
+            if raw:
+                per_scorer.append(_minmax(raw))
+        if not per_scorer:
+            return {}
+        # Average over scorers that have a value for the candidate. Use 0.5
+        # for missing-from-scorer so a candidate covered by one scorer doesn't
+        # get unfairly penalized vs one covered by multiple.
+        all_keys = set().union(*(d.keys() for d in per_scorer))
+        out: Dict[str, float] = {}
+        for k in all_keys:
+            vals = [d.get(k, 0.5) for d in per_scorer]
+            out[k] = sum(vals) / len(vals)
+        return out
 
     # ------------------------------------------------------------------
     # Candidate generation
@@ -513,13 +550,11 @@ class Reranker:
                     liked_genres[g] = liked_genres.get(g, 0.0) + (rating - 3.0)
         total_genre_weight = sum(liked_genres.values()) or 1.0
 
-        # Content (TF-IDF cosine) scoring — computed once per user.
+        # Content scoring — averaged across however many scorers are wired
+        # (genome + directors today; sentence-transformer embeddings later).
         content_norm: Dict[str, float] = {}
-        if self.content and weights.content > 0:
-            taste = self.content.taste_vector(user_ratings)
-            if taste is not None:
-                content_raw = self.content.score(taste, candidate_ids)
-                content_norm = _minmax(content_raw)
+        if self.content_scorers and weights.content > 0:
+            content_norm = self._content_norms(user_ratings, candidate_ids)
 
         out: Dict[str, float] = {}
         for mid in candidate_ids:
@@ -586,13 +621,11 @@ class Reranker:
                     liked_genres[g] = liked_genres.get(g, 0.0) + (rating - 3.0)
         top_rated_movies.sort(key=lambda kv: kv[1], reverse=True)
 
-        # Content (TF-IDF cosine) scoring — computed once per user.
+        # Content scoring — averaged across however many scorers are wired
+        # (genome + directors today; sentence-transformer embeddings later).
         content_norm: Dict[str, float] = {}
-        if self.content and weights.content > 0:
-            taste = self.content.taste_vector(user_ratings)
-            if taste is not None:
-                content_raw = self.content.score(taste, candidates)
-                content_norm = _minmax(content_raw)
+        if self.content_scorers and weights.content > 0:
+            content_norm = self._content_norms(user_ratings, candidates)
 
         # Score each candidate (without diversity yet — diversity is applied iteratively)
         base_scores: Dict[str, Dict[str, float]] = {}

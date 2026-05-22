@@ -4,10 +4,12 @@ ml-32m.zip
 letterboxd-alexwoof-2025-04-18-19-33-utc.zip
 /alex_data
 
-# Bulky downloads we extract for content features — regenerable by
-# downloading genome_2021.zip from grouplens.org
+# Bulky downloads we extract for content features — all regenerable
 /archives/genome_2021.zip
 /archives/movie_dataset_public_final
+/archives/title.crew.tsv.gz
+/archives/name.basics.tsv.gz
+/archives/title.basics.tsv.gz
 /ml-latest-small
 # Ignore model artifacts but keep model_card.json provenance in git
 /models/*.pkl

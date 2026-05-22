@@ -77,13 +77,31 @@ def load_state() -> ModelState:
     content = None
     if content_path.with_suffix(".npz").exists():
         content = ContentFeatures.load(content_path)
-        logger.info("loaded content features: %d movies, %d features",
+        logger.info("loaded primary content features: %d movies, %d features",
                     content.tfidf.shape[0], content.n_features)
     else:
         logger.warning("no content features at %s — running CF-only", content_path)
 
+    # Optional extra content scorers, comma-separated paths in env. The
+    # reranker averages all of them. Default: stack genome (primary) +
+    # directors if both exist on disk.
+    extra: list[ContentFeatures] = []
+    extra_env = os.getenv("CONTENT_FEATURES_EXTRA", "")
+    if extra_env.strip():
+        for path_str in extra_env.split(","):
+            p = Path(path_str.strip())
+            if p.with_suffix(".npz").exists():
+                cf = ContentFeatures.load(p)
+                extra.append(cf)
+                logger.info("loaded extra content features %s: %d movies, %d features",
+                            p, cf.tfidf.shape[0], cf.n_features)
+    # No auto-discovery. Director one-hots dilute the genome cosine when
+    # averaged equally and need per-scorer weights to land cleanly.
+    # Opt in via CONTENT_FEATURES_EXTRA=/app/data/content_directors.
+
     reranker = Reranker(svd, als, popularity, movies_df, genre_features,
-                        content_features=content)
+                        content_features=content,
+                        content_features_extra=extra)
     group_reranker = GroupReranker(reranker)
 
     cache = Cache(str(cache_dir))
