@@ -318,6 +318,32 @@ def load_user_data_with_tmdb(ratings_path: str, links_path: str) -> Dict[str, fl
     # Merge to get MovieLens IDs
     merged = user_df.merge(links_df, left_on=tmdb_col, right_on='tmdbId')
     user_ratings = dict(zip(merged['movieId'], merged[rating_col]))
-    
+
     logger.info(f"Loaded {len(user_ratings)} user ratings with MovieLens mapping")
     return user_ratings
+
+
+def load_watched_movies_with_tmdb(watched_path: str, links_path: str):
+    """Load a Letterboxd watched.csv (already enriched with TMDB IDs) and
+    return a set of MovieLens movieId strings.
+
+    Watched-but-unrated films should still be excluded from recommendations,
+    and they're a positive implicit-feedback signal for the ALS scorer.
+    """
+    watched_df = pd.read_csv(watched_path)
+    links_df = pd.read_csv(links_path)
+
+    tmdb_col = 'tmdb_id' if 'tmdb_id' in watched_df.columns else 'tmdbId'
+    watched_df[tmdb_col] = pd.to_numeric(watched_df[tmdb_col], errors="coerce")
+    watched_df = watched_df.dropna(subset=[tmdb_col])
+    watched_df[tmdb_col] = watched_df[tmdb_col].astype(int).astype(str)
+
+    links_df['tmdbId'] = pd.to_numeric(links_df['tmdbId'], errors="coerce")
+    links_df = links_df.dropna(subset=['tmdbId'])
+    links_df['tmdbId'] = links_df['tmdbId'].astype(int).astype(str)
+    links_df['movieId'] = links_df['movieId'].astype(str)
+
+    merged = watched_df.merge(links_df, left_on=tmdb_col, right_on='tmdbId')
+    watched = set(merged['movieId'].tolist())
+    logger.info(f"Loaded {len(watched)} watched movies with MovieLens mapping")
+    return watched

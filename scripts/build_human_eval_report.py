@@ -18,7 +18,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.evaluation import build_genre_features
 from src.group_reranker import GROUP_STRATEGIES, GroupReranker
-from src.recommendations import load_user_data_with_tmdb
+from src.recommendations import load_user_data_with_tmdb, load_watched_movies_with_tmdb
 from src.reranking import (
     ALSScorer,
     MODE_WEIGHTS,
@@ -51,6 +51,13 @@ def main() -> int:
         str(PROJECT_ROOT / "alex_data" / "ratings_with_tmdb.csv"),
         str(LINKS_PATH),
     )
+    real_watched = load_watched_movies_with_tmdb(
+        str(PROJECT_ROOT / "alex_data" / "watched_with_tmdb.csv"),
+        str(LINKS_PATH),
+    )
+    # Watched-only set (watched but never rated) — these are the ones that
+    # need explicit exclusion; rated films are already excluded via user_ratings.
+    watched_only = real_watched - set(real_user.keys())
     ratings["userId"] = ratings["userId"].astype(int)
     ratings["movieId"] = ratings["movieId"].astype(str)
     counts = ratings.groupby("userId").size()
@@ -69,7 +76,11 @@ def main() -> int:
         .to_dict()
         .items()
     }
-    members = [("alex", real_user, None), ("friend_A", friend_a, None), ("friend_B", friend_b, None)]
+    members = [
+        ("alex", real_user, watched_only),
+        ("friend_A", friend_a, None),
+        ("friend_B", friend_b, None),
+    ]
 
     out: list[str] = []
     out.append("# Phase 1 Human-Eval Check-in — ml-32m (full catalog)")
@@ -77,7 +88,7 @@ def main() -> int:
     out.append("**Purpose:** scan a sample of individual and group recommendations and flag anything that looks off. The offline metrics say the re-ranker improved (table at the bottom), but only you can say if the *vibes* are right.")
     out.append("")
     out.append("**Models:** `models/svd_full.pkl` + `models/als_full.pkl` — both trained on **ml-32m** (87k items, 200k users). This replaces the Phase 1 initial run on ml-latest-small.")
-    out.append(f"**User:** `alex_data/ratings_with_tmdb.csv` ({len(real_user)} ratings mapped to MovieLens 32m).")
+    out.append(f"**User:** `alex_data/ratings_with_tmdb.csv` ({len(real_user)} ratings mapped to MovieLens 32m, plus {len(watched_only)} watched-but-unrated films also excluded from recs).")
     out.append(f"**Synthetic friends:** two random MovieLens users with {len(friend_a)} and {len(friend_b)} ratings respectively.")
     out.append("")
     out.append("---")
@@ -91,7 +102,7 @@ def main() -> int:
         out.append("")
         out.append("| # | Score | Pop | Title | Genre overlap | Source |")
         out.append("|--:|------:|:---:|:------|:--------------|:------:|")
-        recs = rr.recommend(real_user, mode=mode, top_n=10)
+        recs = rr.recommend(real_user, watched_movies=watched_only, mode=mode, top_n=10)
         for i, c in enumerate(recs, 1):
             out.append(
                 f"| {i} | {c.score:.3f} | {c.explanation.popularity_tier} | "

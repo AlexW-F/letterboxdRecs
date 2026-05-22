@@ -74,29 +74,46 @@ class ScoredCandidate:
 
 @dataclass
 class ModeWeights:
-    """Weights for the hybrid re-rank formula. Higher = more influence."""
+    """Weights for the hybrid re-rank formula. Higher = more influence.
+
+    ``min_rating_count`` is a hard filter (not a weight): candidates with
+    fewer than N ratings in the trainset are dropped before scoring. This
+    guards against statistical noise from long-tail items where the CF
+    model has fit a single user's enthusiasm into a high item bias.
+    """
     svd: float = 1.0
     als: float = 1.0
     popularity_penalty: float = 0.3
     implicit_bonus: float = 0.5
     diversity_penalty: float = 0.4
     content: float = 0.0  # Phase 2 plugs into this
+    min_rating_count: int = 20
 
 
 MODE_WEIGHTS: Dict[str, ModeWeights] = {
-    # Faithful port of the notebook's four strategies, expressed as weights:
-    # "balanced_discovery" was 70% rating + 30% inverse popularity
-    "balanced": ModeWeights(svd=1.0, als=1.0, popularity_penalty=0.4,
-                            implicit_bonus=0.5, diversity_penalty=0.4),
-    # "hidden_gems" / "niche": strong popularity penalty, looser diversity
-    "niche": ModeWeights(svd=0.7, als=1.0, popularity_penalty=1.2,
-                         implicit_bonus=0.6, diversity_penalty=0.3),
-    # mainstream-friendly: trust the CF scores, mild popularity bonus
-    "popular": ModeWeights(svd=1.2, als=1.0, popularity_penalty=-0.2,
-                           implicit_bonus=0.3, diversity_penalty=0.2),
-    # serendipitous: high diversity weight, modest popularity penalty
-    "serendipitous": ModeWeights(svd=0.6, als=0.9, popularity_penalty=0.6,
-                                 implicit_bonus=0.7, diversity_penalty=1.0),
+    # "balanced_discovery" — mid-popularity, decent diversity, sane floor.
+    # popularity_penalty pulls noticeably away from blockbusters so this
+    # diverges from `popular` in the top-K.
+    "balanced": ModeWeights(svd=1.0, als=1.0, popularity_penalty=0.7,
+                            implicit_bonus=0.5, diversity_penalty=0.4,
+                            min_rating_count=50),
+    # "hidden_gems" / "niche": strong popularity penalty, but still require
+    # enough ratings to filter out the long-tail-noise picks
+    # (single-user-rated-5 movies) the user flagged.
+    "niche": ModeWeights(svd=0.7, als=1.0, popularity_penalty=1.5,
+                         implicit_bonus=0.6, diversity_penalty=0.3,
+                         min_rating_count=30),
+    # Mainstream-friendly: significant popularity *bonus*. SVD weighted up
+    # because SVD is trained on "what the crowd likes" — exactly the popular
+    # signal. Lower diversity weight lets clusters of classics stay together.
+    "popular": ModeWeights(svd=1.4, als=1.0, popularity_penalty=-0.8,
+                           implicit_bonus=0.3, diversity_penalty=0.15,
+                           min_rating_count=200),
+    # Serendipitous: highest diversity weight; we still need enough ratings
+    # to call something a genuine surprise rather than a single-rater spike.
+    "serendipitous": ModeWeights(svd=0.6, als=0.9, popularity_penalty=0.7,
+                                 implicit_bonus=0.7, diversity_penalty=1.0,
+                                 min_rating_count=25),
 }
 
 
@@ -354,10 +371,14 @@ class Reranker:
         user_ratings: Dict[str, float],
         watched_movies: Optional[Iterable[str]] = None,
         n_per_source: int = DEFAULT_CANDIDATE_POOL_SIZE,
+        min_rating_count: int = 0,
     ) -> Tuple[Set[str], Dict[str, float], Dict[str, float]]:
         """Union top-N candidates from each scorer; return (candidates, svd_scores, als_scores).
 
-        Filters out movies the user has already rated or watched.
+        Excludes movies the user has already rated or watched. If
+        ``min_rating_count`` > 0, drops candidates with fewer than that
+        many ratings in the trainset — a guard against single-rater-noise
+        long-tail items that confuse the niche/balanced modes.
         """
         exclude = {str(m) for m in user_ratings}
         if watched_movies:
@@ -370,8 +391,15 @@ class Reranker:
         top_svd = sorted(svd_scores.items(), key=lambda kv: kv[1], reverse=True)[: n_per_source]
         top_als = sorted(als_scores.items(), key=lambda kv: kv[1], reverse=True)[: n_per_source]
 
-        candidates = {mid for mid, _ in top_svd if mid not in exclude}
-        candidates |= {mid for mid, _ in top_als if mid not in exclude}
+        def _passes(mid: str) -> bool:
+            if mid in exclude:
+                return False
+            if min_rating_count > 0 and self.popularity.counts.get(mid, 0) < min_rating_count:
+                return False
+            return True
+
+        candidates = {mid for mid, _ in top_svd if _passes(mid)}
+        candidates |= {mid for mid, _ in top_als if _passes(mid)}
         return candidates, svd_scores, als_scores
 
     # ------------------------------------------------------------------
@@ -449,6 +477,11 @@ class Reranker:
             raise ValueError(f"Unknown mode {mode!r}")
 
         candidate_ids = {str(c) for c in candidate_ids}
+        if weights.min_rating_count > 0:
+            candidate_ids = {
+                c for c in candidate_ids
+                if self.popularity.counts.get(c, 0) >= weights.min_rating_count
+            }
         svd_all = self.svd.score_all(user_ratings) if self.svd else {}
         als_all = self.als.score_all(user_ratings, watched_movies, n_return=max(2000, len(candidate_ids))) if self.als else {}
 
@@ -502,7 +535,8 @@ class Reranker:
             return self._popularity_by_genre_fallback(user_ratings, top_n)
 
         candidates, svd_scores, als_scores = self.generate_candidates(
-            user_ratings, watched_movies, n_per_source=n_candidates
+            user_ratings, watched_movies, n_per_source=n_candidates,
+            min_rating_count=weights.min_rating_count,
         )
         if not candidates:
             return []

@@ -3,7 +3,7 @@
 **Purpose:** scan a sample of individual and group recommendations and flag anything that looks off. The offline metrics say the re-ranker improved (table at the bottom), but only you can say if the *vibes* are right.
 
 **Models:** `models/svd_full.pkl` + `models/als_full.pkl` — both trained on **ml-32m** (87k items, 200k users). This replaces the Phase 1 initial run on ml-latest-small.
-**User:** `alex_data/ratings_with_tmdb.csv` (220 ratings mapped to MovieLens 32m).
+**User:** `alex_data/ratings_with_tmdb.csv` (220 ratings mapped to MovieLens 32m, plus 258 watched-but-unrated films also excluded from recs).
 **Synthetic friends:** two random MovieLens users with 155 and 177 ratings respectively.
 
 ---
@@ -14,61 +14,61 @@
 
 | # | Score | Pop | Title | Genre overlap | Source |
 |--:|------:|:---:|:------|:--------------|:------:|
-| 1 | 1.645 | obscure | Twin Peaks (1989) | Drama, Mystery | svd+als |
-| 2 | 1.478 | popular | Parasite (2019) | Drama, Comedy | svd+als |
-| 3 | 1.442 | obscure | Neon Genesis Evangelion: The End of Evangelion (Shin seiki Evangelion Gekijô-ban: Air/Magokoro wo, kimi ni) (1997) | Drama, Action, Sci-Fi | svd+als |
-| 4 | 1.400 | obscure | Interrogation (Przesluchanie) (1989) | Drama, Thriller, Crime | svd |
-| 5 | 1.379 | obscure | Shoplifters (2018) | Drama | svd+als |
-| 6 | 1.358 | obscure | Disappearance of Haruhi Suzumiya, The (Suzumiya Haruhi no shôshitsu) (2010) | Drama, Adventure, Sci-Fi | svd |
-| 7 | 1.343 | obscure | A Cowgirl's Story (2017) | Children | svd |
-| 8 | 1.335 | obscure | Be With You (2004) | Drama, Fantasy, Romance | svd |
-| 9 | 1.331 | obscure | Near Death (1989) | Documentary | svd |
-| 10 | 1.284 | obscure | Three Wise Cousins (2016) |  | svd |
+| 1 | 1.480 | obscure | Twin Peaks (1989) | Drama, Mystery | svd+als |
+| 2 | 1.249 | obscure | Son of the White Mare (1981) | Adventure, Fantasy, Animation | svd |
+| 3 | 1.235 | popular | Parasite (2019) | Drama, Comedy | svd+als |
+| 4 | 1.225 | obscure | Disappearance of Haruhi Suzumiya, The (Suzumiya Haruhi no shôshitsu) (2010) | Drama, Adventure, Sci-Fi | svd |
+| 5 | 1.202 | obscure | Shoplifters (2018) | Drama | svd+als |
+| 6 | 1.180 | obscure | Sherman's March (1985) | Documentary | svd |
+| 7 | 1.133 | obscure | Heartstone (2016) | Drama, Romance | svd |
+| 8 | 1.129 | obscure | Neon Genesis Evangelion: The End of Evangelion (Shin seiki Evangelion Gekijô-ban: Air/Magokoro wo, kimi ni) (1997) | Drama, Action, Sci-Fi | svd+als |
+| 9 | 1.121 | obscure | 7 Boxes (2012) | Thriller | svd |
+| 10 | 1.063 | obscure | Room 8 (2013) |  | svd |
 
 ### Mode: `niche`
 
 | # | Score | Pop | Title | Genre overlap | Source |
 |--:|------:|:---:|:------|:--------------|:------:|
-| 1 | 1.164 | obscure | Parole Girl (1933) | Drama, Crime | svd |
-| 2 | 1.008 | obscure | Abe & Phil's Last Poker Game (2018) | Drama, Comedy | svd |
-| 3 | 1.007 | obscure | A Cowgirl's Story (2017) | Children | svd |
-| 4 | 0.994 | obscure | Three Wise Cousins (2016) |  | svd |
-| 5 | 0.990 | obscure | Loving the Bad Man (2012) | Drama | svd |
-| 6 | 0.974 | obscure | Infinity Train (2016) | Adventure, Animation | svd |
-| 7 | 0.956 | obscure | Seeing Red: Stories of American Communists (1983) |  | svd |
-| 8 | 0.939 | obscure | Near Death (1989) | Documentary | svd |
-| 9 | 0.915 | obscure | Be With You (2004) | Drama, Fantasy, Romance | svd |
-| 10 | 0.898 | obscure | I-Be Area (2007) |  | svd |
+| 1 | 0.896 | obscure | Interrogation (Przesluchanie) (1989) | Drama, Thriller, Crime | svd |
+| 2 | 0.791 | obscure | Absolute Giganten (1999) | Drama, Comedy, Action | svd |
+| 3 | 0.743 | obscure | Mushishi: The Shadow That Devours the Sun (2014) | Adventure, Fantasy, Animation | svd |
+| 4 | 0.706 | obscure | Sweeney Todd: The Demon Barber of Fleet Street (1982) | Drama, Thriller, Horror | svd |
+| 5 | 0.685 | obscure | Twin Peaks (1989) | Drama, Mystery | svd+als |
+| 6 | 0.666 | obscure | Everything's Gonna Be Great (1998) | Drama, Comedy, Adventure | svd |
+| 7 | 0.658 | obscure | Heartstone (2016) | Drama, Romance | svd |
+| 8 | 0.656 | obscure | Cuba and the Cameraman (2017) | Documentary | svd |
+| 9 | 0.645 | obscure | Le Plaisir (1952) | Drama, Comedy | svd |
+| 10 | 0.633 | obscure | Li'l Quinquin (2014) | Comedy, Crime, Mystery | svd |
 
 ### Mode: `popular`
 
 | # | Score | Pop | Title | Genre overlap | Source |
 |--:|------:|:---:|:------|:--------------|:------:|
-| 1 | 2.231 | blockbuster | Pulp Fiction (1994) | Drama, Comedy, Thriller | svd+als |
-| 2 | 2.093 | popular | Parasite (2019) | Drama, Comedy | svd+als |
-| 3 | 2.076 | blockbuster | Godfather, The (1972) | Drama, Crime | svd+als |
-| 4 | 2.065 | obscure | Twin Peaks (1989) | Drama, Mystery | svd+als |
-| 5 | 2.040 | blockbuster | Star Wars: Episode IV - A New Hope (1977) | Action, Adventure, Sci-Fi | svd+als |
-| 6 | 2.033 | popular | Casablanca (1942) | Drama, Romance | svd+als |
-| 7 | 1.970 | obscure | Shoplifters (2018) | Drama | svd+als |
-| 8 | 1.921 | obscure | Neon Genesis Evangelion: The End of Evangelion (Shin seiki Evangelion Gekijô-ban: Air/Magokoro wo, kimi ni) (1997) | Drama, Action, Sci-Fi | svd+als |
-| 9 | 1.860 | popular | Godfather: Part II, The (1974) | Drama, Crime | svd+als |
-| 10 | 1.858 | popular | Blade Runner (1982) | Thriller, Action, Sci-Fi | svd+als |
+| 1 | 2.979 | blockbuster | Godfather, The (1972) | Drama, Crime | svd+als |
+| 2 | 2.800 | popular | Casablanca (1942) | Drama, Romance | svd+als |
+| 3 | 2.786 | popular | Parasite (2019) | Drama, Comedy | svd+als |
+| 4 | 2.649 | popular | Godfather: Part II, The (1974) | Drama, Crime | svd+als |
+| 5 | 2.638 | obscure | Twin Peaks (1989) | Drama, Mystery | svd+als |
+| 6 | 2.553 | popular | One Flew Over the Cuckoo's Nest (1975) | Drama | svd+als |
+| 7 | 2.534 | niche | Kiki's Delivery Service (Majo no takkyûbin) (1989) | Drama, Adventure, Fantasy | svd+als |
+| 8 | 2.530 | popular | Vertigo (1958) | Drama, Thriller, Romance | svd+als |
+| 9 | 2.495 | popular | Kill Bill: Vol. 1 (2003) | Thriller, Action, Crime | svd+als |
+| 10 | 2.482 | obscure | Neon Genesis Evangelion: The End of Evangelion (Shin seiki Evangelion Gekijô-ban: Air/Magokoro wo, kimi ni) (1997) | Drama, Action, Sci-Fi | svd+als |
 
 ### Mode: `serendipitous`
 
 | # | Score | Pop | Title | Genre overlap | Source |
 |--:|------:|:---:|:------|:--------------|:------:|
-| 1 | 1.140 | obscure | Twin Peaks (1989) | Drama, Mystery | svd+als |
-| 2 | 0.972 | obscure | Infinity Train (2016) | Adventure, Animation | svd |
-| 3 | 0.929 | obscure | A Cowgirl's Story (2017) | Children | svd |
-| 4 | 0.908 | obscure | Near Death (1989) | Documentary | svd |
-| 5 | 0.906 | obscure | Hungama (2003) | Comedy | svd |
-| 6 | 0.899 | obscure | Three Wise Cousins (2016) |  | svd |
-| 7 | 0.882 | obscure | Seeing Red: Stories of American Communists (1983) |  | svd |
-| 8 | 0.876 | obscure | Neon Genesis Evangelion: The End of Evangelion (Shin seiki Evangelion Gekijô-ban: Air/Magokoro wo, kimi ni) (1997) | Drama, Action, Sci-Fi | svd+als |
-| 9 | 0.858 | obscure | I-Be Area (2007) |  | svd |
-| 10 | 0.825 | obscure | Interrogation (Przesluchanie) (1989) | Drama, Thriller, Crime | svd |
+| 1 | 1.096 | obscure | Twin Peaks (1989) | Drama, Mystery | svd+als |
+| 2 | 0.874 | obscure | Son of the White Mare (1981) | Adventure, Fantasy, Animation | svd |
+| 3 | 0.836 | obscure | Love in the Time of Hysteria (Sólo con tu pareja) (1991) | Comedy, Romance | svd |
+| 4 | 0.793 | obscure | Interrogation (Przesluchanie) (1989) | Drama, Thriller, Crime | svd |
+| 5 | 0.787 | obscure | Triumph Over Violence (1965) | Documentary, War | svd |
+| 6 | 0.763 | obscure | Everything's Gonna Be Great (1998) | Drama, Comedy, Adventure | svd |
+| 7 | 0.723 | obscure | Space Odyssey: Voyage to the Planets (2004) | Drama, Sci-Fi, Documentary | svd |
+| 8 | 0.710 | obscure | Wolf Hall (2015) |  | svd |
+| 9 | 0.687 | obscure | Room 8 (2013) |  | svd |
+| 10 | 0.664 | obscure | Bunraku (2010) | Drama, Action, Fantasy | svd |
 
 ---
 
@@ -80,91 +80,91 @@ Each row shows the predicted score per member (normalized 0-1) and the fairness 
 
 | # | Score | Fair | Title | Pop | Per-member scores |
 |--:|------:|-----:|:------|:---:|:------------------|
-| 1 | 0.824 | 0.18 | Godfather: Part II, The (1974) | popular | alex=0.83, friend_A=0.64, friend_B=1.00 |
-| 2 | 0.796 | 0.01 | Princes and Princesses (2000) | obscure | alex=0.81, friend_A=0.78, friend_B=0.80 |
-| 3 | 0.786 | 0.08 | Interrogation (Przesluchanie) (1989) | obscure | alex=0.87, friend_A=0.72, friend_B=0.76 |
-| 4 | 0.749 | 0.22 | City of God (Cidade de Deus) (2002) | popular | alex=0.77, friend_A=0.54, friend_B=0.94 |
-| 5 | 0.734 | 0.10 | Sweeney Todd: The Demon Barber of Fleet Street (1982) | obscure | alex=0.80, friend_A=0.77, friend_B=0.63 |
-| 6 | 0.721 | 0.18 | The Collapsed (2011) | obscure | alex=0.69, friend_A=0.89, friend_B=0.58 |
-| 7 | 0.720 | 0.16 | Zatoichi's Cane Sword (Zatôichi tekka tabi) (Zatôichi 15) (1967) | obscure | alex=0.66, friend_A=0.62, friend_B=0.88 |
-| 8 | 0.715 | 0.22 | Pulp Fiction (1994) | blockbuster | alex=0.93, friend_A=0.57, friend_B=0.64 |
-| 9 | 0.703 | 0.19 | Monkey in Winter, A (Un singe en hiver) (1962) | obscure | alex=0.67, friend_A=0.88, friend_B=0.56 |
-| 10 | 0.703 | 0.09 | Goyokin (1969) | obscure | alex=0.67, friend_A=0.65, friend_B=0.79 |
+| 1 | 0.789 | 0.10 | Invisible War, The (2012) | obscure | alex=0.69, friend_A=0.88, friend_B=0.79 |
+| 2 | 0.774 | 0.10 | The Dawns Here are Quiet (1972) | obscure | alex=0.74, friend_A=0.70, friend_B=0.88 |
+| 3 | 0.773 | 0.20 | Godfather: Part II, The (1974) | popular | alex=0.77, friend_A=0.58, friend_B=0.96 |
+| 4 | 0.760 | 0.16 | Adventure Time: Islands (2017) | obscure | alex=0.75, friend_A=0.62, friend_B=0.91 |
+| 5 | 0.759 | 0.06 | Everything's Gonna Be Great (1998) | obscure | alex=0.82, friend_A=0.71, friend_B=0.74 |
+| 6 | 0.758 | 0.11 | Heartstone (2016) | obscure | alex=0.86, friend_A=0.75, friend_B=0.66 |
+| 7 | 0.757 | 0.04 | Saint Frances (2020) | obscure | alex=0.76, friend_A=0.80, friend_B=0.72 |
+| 8 | 0.753 | 0.15 | The Amazing Screw-On Head (2006) | obscure | alex=0.62, friend_A=0.76, friend_B=0.89 |
+| 9 | 0.725 | 0.18 | 5 Fingers (1952) | obscure | alex=0.63, friend_A=0.64, friend_B=0.91 |
+| 10 | 0.724 | 0.11 | Strike (Stachka) (1925) | obscure | alex=0.73, friend_A=0.82, friend_B=0.63 |
 
 ### Strategy: `least_misery`
 
 | # | Score | Fair | Title | Pop | Per-member scores |
 |--:|------:|-----:|:------|:---:|:------------------|
-| 1 | 0.784 | 0.01 | Princes and Princesses (2000) | obscure | alex=0.81, friend_A=0.78, friend_B=0.80 |
-| 2 | 0.723 | 0.08 | Interrogation (Przesluchanie) (1989) | obscure | alex=0.87, friend_A=0.72, friend_B=0.76 |
-| 3 | 0.650 | 0.09 | Goyokin (1969) | obscure | alex=0.67, friend_A=0.65, friend_B=0.79 |
-| 4 | 0.646 | 0.08 | The Fatal Encounter (2014) | obscure | alex=0.77, friend_A=0.68, friend_B=0.65 |
-| 5 | 0.643 | 0.18 | Godfather: Part II, The (1974) | popular | alex=0.83, friend_A=0.64, friend_B=1.00 |
-| 6 | 0.638 | 0.07 | The Dawns Here are Quiet (1972) | obscure | alex=0.69, friend_A=0.64, friend_B=0.77 |
-| 7 | 0.628 | 0.10 | Sweeney Todd: The Demon Barber of Fleet Street (1982) | obscure | alex=0.80, friend_A=0.77, friend_B=0.63 |
-| 8 | 0.622 | 0.13 | I'm Staying (2007) | obscure | alex=0.82, friend_A=0.62, friend_B=0.64 |
-| 9 | 0.619 | 0.16 | Zatoichi's Cane Sword (Zatôichi tekka tabi) (Zatôichi 15) (1967) | obscure | alex=0.66, friend_A=0.62, friend_B=0.88 |
-| 10 | 0.618 | 0.14 | Invisible War, The (2012) | obscure | alex=0.62, friend_A=0.83, friend_B=0.65 |
+| 1 | 0.715 | 0.04 | Saint Frances (2020) | obscure | alex=0.76, friend_A=0.80, friend_B=0.72 |
+| 2 | 0.712 | 0.06 | Everything's Gonna Be Great (1998) | obscure | alex=0.82, friend_A=0.71, friend_B=0.74 |
+| 3 | 0.699 | 0.10 | The Dawns Here are Quiet (1972) | obscure | alex=0.74, friend_A=0.70, friend_B=0.88 |
+| 4 | 0.690 | 0.10 | Invisible War, The (2012) | obscure | alex=0.69, friend_A=0.88, friend_B=0.79 |
+| 5 | 0.678 | 0.05 | War of the Buttons (1994) | obscure | alex=0.76, friend_A=0.68, friend_B=0.72 |
+| 6 | 0.664 | 0.11 | Heartstone (2016) | obscure | alex=0.86, friend_A=0.75, friend_B=0.66 |
+| 7 | 0.635 | 0.09 | Innocent Voices (Voces inocentes) (2004) | obscure | alex=0.64, friend_A=0.80, friend_B=0.73 |
+| 8 | 0.632 | 0.09 | Chris Rock: Bigger & Blacker (1999) | obscure | alex=0.63, friend_A=0.79, friend_B=0.72 |
+| 9 | 0.631 | 0.08 | Beastie Boys: Sabotage (1994) | obscure | alex=0.63, friend_A=0.76, friend_B=0.72 |
+| 10 | 0.631 | 0.18 | 5 Fingers (1952) | obscure | alex=0.63, friend_A=0.64, friend_B=0.91 |
 
 ### Strategy: `most_pleasure`
 
 | # | Score | Fair | Title | Pop | Per-member scores |
 |--:|------:|-----:|:------|:---:|:------------------|
-| 1 | 1.000 | 0.18 | Godfather: Part II, The (1974) | popular | alex=0.83, friend_A=0.64, friend_B=1.00 |
-| 2 | 1.000 | 0.73 | Twin Peaks (1989) | obscure | alex=1.00, friend_A=0.03, friend_B=0.61 |
-| 3 | 1.000 | 0.76 | Room, The (2003) | obscure | alex=0.03, friend_A=1.00, friend_B=0.53 |
-| 4 | 0.974 | 0.68 | All the President's Men (1976) | niche | alex=0.18, friend_A=0.35, friend_B=0.97 |
-| 5 | 0.958 | 0.62 | Neon Genesis Evangelion: The End of Evangelion (Shin seiki Evangelion Gekijô-ban: Air/Magokoro wo, kimi ni) (1997) | obscure | alex=0.96, friend_A=0.49, friend_B=0.15 |
-| 6 | 0.954 | 0.54 | Parasite (2019) | popular | alex=0.95, friend_A=0.21, friend_B=0.52 |
-| 7 | 0.947 | 0.51 | Shoplifters (2018) | obscure | alex=0.95, friend_A=0.25, friend_B=0.50 |
-| 8 | 0.940 | 0.22 | City of God (Cidade de Deus) (2002) | popular | alex=0.77, friend_A=0.54, friend_B=0.94 |
-| 9 | 0.938 | 0.34 | Taxi Driver (1976) | popular | alex=0.53, friend_A=0.43, friend_B=0.94 |
-| 10 | 0.937 | 0.81 | Bridge on the River Kwai, The (1957) | popular | alex=0.46, friend_A=0.01, friend_B=0.94 |
+| 1 | 1.000 | 0.54 | Room, The (2003) | obscure | alex=0.19, friend_A=1.00, friend_B=0.64 |
+| 2 | 1.000 | 0.73 | All the President's Men (1976) | niche | alex=0.15, friend_A=0.34, friend_B=1.00 |
+| 3 | 1.000 | 0.66 | Twin Peaks (1989) | obscure | alex=1.00, friend_A=0.07, friend_B=0.70 |
+| 4 | 0.962 | 0.20 | Godfather: Part II, The (1974) | popular | alex=0.77, friend_A=0.58, friend_B=0.96 |
+| 5 | 0.949 | 0.45 | Shoplifters (2018) | obscure | alex=0.95, friend_A=0.28, friend_B=0.61 |
+| 6 | 0.938 | 0.83 | Bridge on the River Kwai, The (1957) | popular | alex=0.45, friend_A=0.00, friend_B=0.94 |
+| 7 | 0.937 | 0.25 | City of God (Cidade de Deus) (2002) | popular | alex=0.71, friend_A=0.50, friend_B=0.94 |
+| 8 | 0.934 | 0.40 | Taxi Driver (1976) | popular | alex=0.48, friend_A=0.38, friend_B=0.93 |
+| 9 | 0.922 | 0.41 | North by Northwest (1959) | popular | alex=0.68, friend_A=0.30, friend_B=0.92 |
+| 10 | 0.920 | 0.45 | Neon Genesis Evangelion: The End of Evangelion (Shin seiki Evangelion Gekijô-ban: Air/Magokoro wo, kimi ni) (1997) | obscure | alex=0.92, friend_A=0.50, friend_B=0.30 |
 
 ### Strategy: `consensus`
 
 | # | Score | Fair | Title | Pop | Per-member scores |
 |--:|------:|-----:|:------|:---:|:------------------|
-| 1 | 0.803 | 0.18 | Godfather: Part II, The (1974) | popular | alex=0.83, friend_A=0.64, friend_B=1.00 |
-| 2 | 0.796 | 0.01 | Princes and Princesses (2000) | obscure | alex=0.81, friend_A=0.78, friend_B=0.80 |
-| 3 | 0.782 | 0.08 | Interrogation (Przesluchanie) (1989) | obscure | alex=0.87, friend_A=0.72, friend_B=0.76 |
-| 4 | 0.728 | 0.10 | Sweeney Todd: The Demon Barber of Fleet Street (1982) | obscure | alex=0.80, friend_A=0.77, friend_B=0.63 |
-| 5 | 0.723 | 0.22 | City of God (Cidade de Deus) (2002) | popular | alex=0.77, friend_A=0.54, friend_B=0.94 |
-| 6 | 0.707 | 0.16 | Zatoichi's Cane Sword (Zatôichi tekka tabi) (Zatôichi 15) (1967) | obscure | alex=0.66, friend_A=0.62, friend_B=0.88 |
-| 7 | 0.704 | 0.18 | The Collapsed (2011) | obscure | alex=0.69, friend_A=0.89, friend_B=0.58 |
-| 8 | 0.699 | 0.09 | Goyokin (1969) | obscure | alex=0.67, friend_A=0.65, friend_B=0.79 |
-| 9 | 0.697 | 0.08 | The Fatal Encounter (2014) | obscure | alex=0.77, friend_A=0.68, friend_B=0.65 |
-| 10 | 0.695 | 0.07 | The Dawns Here are Quiet (1972) | obscure | alex=0.69, friend_A=0.64, friend_B=0.77 |
+| 1 | 0.782 | 0.10 | Invisible War, The (2012) | obscure | alex=0.69, friend_A=0.88, friend_B=0.79 |
+| 2 | 0.768 | 0.10 | The Dawns Here are Quiet (1972) | obscure | alex=0.74, friend_A=0.70, friend_B=0.88 |
+| 3 | 0.757 | 0.06 | Everything's Gonna Be Great (1998) | obscure | alex=0.82, friend_A=0.71, friend_B=0.74 |
+| 4 | 0.756 | 0.04 | Saint Frances (2020) | obscure | alex=0.76, friend_A=0.80, friend_B=0.72 |
+| 5 | 0.751 | 0.11 | Heartstone (2016) | obscure | alex=0.86, friend_A=0.75, friend_B=0.66 |
+| 6 | 0.749 | 0.20 | Godfather: Part II, The (1974) | popular | alex=0.77, friend_A=0.58, friend_B=0.96 |
+| 7 | 0.745 | 0.16 | Adventure Time: Islands (2017) | obscure | alex=0.75, friend_A=0.62, friend_B=0.91 |
+| 8 | 0.741 | 0.15 | The Amazing Screw-On Head (2006) | obscure | alex=0.62, friend_A=0.76, friend_B=0.89 |
+| 9 | 0.718 | 0.05 | War of the Buttons (1994) | obscure | alex=0.76, friend_A=0.68, friend_B=0.72 |
+| 10 | 0.718 | 0.11 | Strike (Stachka) (1925) | obscure | alex=0.73, friend_A=0.82, friend_B=0.63 |
 
 ### Strategy: `hybrid`
 
 | # | Score | Fair | Title | Pop | Per-member scores |
 |--:|------:|-----:|:------|:---:|:------------------|
-| 1 | 1.188 | 0.01 | Princes and Princesses (2000) | obscure | alex=0.81, friend_A=0.78, friend_B=0.80 |
-| 2 | 1.148 | 0.08 | Interrogation (Przesluchanie) (1989) | obscure | alex=0.87, friend_A=0.72, friend_B=0.76 |
-| 3 | 1.145 | 0.18 | Godfather: Part II, The (1974) | popular | alex=0.83, friend_A=0.64, friend_B=1.00 |
-| 4 | 1.048 | 0.10 | Sweeney Todd: The Demon Barber of Fleet Street (1982) | obscure | alex=0.80, friend_A=0.77, friend_B=0.63 |
-| 5 | 1.029 | 0.16 | Zatoichi's Cane Sword (Zatôichi tekka tabi) (Zatôichi 15) (1967) | obscure | alex=0.66, friend_A=0.62, friend_B=0.88 |
-| 6 | 1.028 | 0.09 | Goyokin (1969) | obscure | alex=0.67, friend_A=0.65, friend_B=0.79 |
-| 7 | 1.023 | 0.08 | The Fatal Encounter (2014) | obscure | alex=0.77, friend_A=0.68, friend_B=0.65 |
-| 8 | 1.020 | 0.22 | City of God (Cidade de Deus) (2002) | popular | alex=0.77, friend_A=0.54, friend_B=0.94 |
-| 9 | 1.017 | 0.07 | The Dawns Here are Quiet (1972) | obscure | alex=0.69, friend_A=0.64, friend_B=0.77 |
-| 10 | 1.011 | 0.14 | Invisible War, The (2012) | obscure | alex=0.62, friend_A=0.83, friend_B=0.65 |
+| 1 | 1.134 | 0.10 | Invisible War, The (2012) | obscure | alex=0.69, friend_A=0.88, friend_B=0.79 |
+| 2 | 1.123 | 0.10 | The Dawns Here are Quiet (1972) | obscure | alex=0.74, friend_A=0.70, friend_B=0.88 |
+| 3 | 1.115 | 0.06 | Everything's Gonna Be Great (1998) | obscure | alex=0.82, friend_A=0.71, friend_B=0.74 |
+| 4 | 1.115 | 0.04 | Saint Frances (2020) | obscure | alex=0.76, friend_A=0.80, friend_B=0.72 |
+| 5 | 1.090 | 0.11 | Heartstone (2016) | obscure | alex=0.86, friend_A=0.75, friend_B=0.66 |
+| 6 | 1.067 | 0.16 | Adventure Time: Islands (2017) | obscure | alex=0.75, friend_A=0.62, friend_B=0.91 |
+| 7 | 1.064 | 0.20 | Godfather: Part II, The (1974) | popular | alex=0.77, friend_A=0.58, friend_B=0.96 |
+| 8 | 1.062 | 0.15 | The Amazing Screw-On Head (2006) | obscure | alex=0.62, friend_A=0.76, friend_B=0.89 |
+| 9 | 1.058 | 0.05 | War of the Buttons (1994) | obscure | alex=0.76, friend_A=0.68, friend_B=0.72 |
+| 10 | 1.041 | 0.18 | 5 Fingers (1952) | obscure | alex=0.63, friend_A=0.64, friend_B=0.91 |
 
 ### Strategy: `group_taste_vector`
 
 | # | Score | Fair | Title | Pop | Per-member scores |
 |--:|------:|-----:|:------|:---:|:------------------|
-| 1 | 1.578 | 0.87 | All the President's Men (1976) | niche | alex=0.05, friend_A=0.57, friend_B=1.60 |
-| 2 | 1.474 | 0.38 | Kiki's Delivery Service (Majo no takkyûbin) (1989) | niche | alex=1.24, friend_A=1.33, friend_B=0.47 |
-| 3 | 1.411 | 0.55 | Network (1976) | niche | alex=0.32, friend_A=0.47, friend_B=1.12 |
-| 4 | 1.355 | 0.44 | North by Northwest (1959) | popular | alex=1.06, friend_A=0.44, friend_B=1.49 |
-| 5 | 1.343 | 0.07 | Trials of Darryl Hunt, The (2006) | obscure | alex=0.92, friend_A=1.06, friend_B=1.07 |
-| 6 | 1.323 | 0.21 | Godfather: Part II, The (1974) | popular | alex=1.25, friend_A=1.06, friend_B=1.73 |
-| 7 | 1.293 | 0.28 | Three Wise Cousins (2016) | obscure | alex=1.03, friend_A=1.21, friend_B=0.58 |
-| 8 | 1.268 | 0.21 | The Web (2013) | obscure | alex=0.77, friend_A=1.25, friend_B=0.87 |
-| 9 | 1.267 | 0.57 | Rocky (1976) | popular | alex=0.58, friend_A=0.36, friend_B=1.39 |
-| 10 | 1.254 | 0.29 | What's Opera, Doc? (1957) | obscure | alex=0.57, friend_A=1.06, friend_B=1.22 |
+| 1 | 1.296 | 0.71 | Network (1976) | niche | alex=0.15, friend_A=0.22, friend_B=0.74 |
+| 2 | 1.224 | 0.68 | Kiki's Delivery Service (Majo no takkyûbin) (1989) | niche | alex=1.04, friend_A=1.20, friend_B=0.03 |
+| 3 | 1.157 | 0.46 | The Adventures of Sherlock Holmes and Doctor Watson: King of Blackmailers (1980) | obscure | alex=0.79, friend_A=1.26, friend_B=0.35 |
+| 4 | 1.156 | 1.16 | All the President's Men (1976) | niche | alex=-0.13, friend_A=0.36, friend_B=1.25 |
+| 5 | 1.149 | 0.45 | Connections (1978) | obscure | alex=0.60, friend_A=0.46, friend_B=1.26 |
+| 6 | 1.116 | 0.27 | What's Opera, Doc? (1957) | obscure | alex=0.50, friend_A=0.89, friend_B=0.98 |
+| 7 | 1.107 | 0.05 | The Dawns Here are Quiet (1972) | obscure | alex=0.89, friend_A=0.91, friend_B=1.00 |
+| 8 | 1.093 | 0.31 | I Am So Proud of You (2008) | obscure | alex=0.47, friend_A=1.08, friend_B=0.86 |
+| 9 | 1.071 | 0.31 | Samurai III: Duel on Ganryu Island (a.k.a. Bushido) (Miyamoto Musashi kanketsuhen: kettô Ganryûjima) (1956) | obscure | alex=0.95, friend_A=0.42, friend_B=0.76 |
+| 10 | 1.064 | 0.27 | Beastie Boys: Sabotage (1994) | obscure | alex=0.71, friend_A=1.20, friend_B=0.71 |
 
 ---
 
