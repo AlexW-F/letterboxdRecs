@@ -194,18 +194,41 @@ OpenAPI docs at `http://localhost:8000/docs`. Endpoints:
 
 Caching is content-addressable — re-uploading the same export hits the same diskcache entry, no session lifecycle.
 
-### Running in Docker
+### Full stack via docker compose
+
+The fastest way to run everything locally — FastAPI + SvelteKit + nginx, with the frontend proxying `/api/*` to the backend over the internal docker network:
 
 ```bash
-docker build -t letterboxd-recs .
+docker compose up --build
+# then open http://localhost:5173/
+```
+
+What the stack expects on disk (read-only mounted into the api container):
+- `models/svd_full_slim.pkl` — Surprise SVD on ml-32m (run `scripts/train_svd.py` then `scripts/slim_svd_pickle.py`)
+- `models/als_full.pkl` — implicit ALS on ml-32m (run `scripts/train_als.py --ratings ml-32m/ratings.csv`)
+- `data/content_genome.{npz,json}` — Tag Genome 2021 content features (download `genome_2021.zip` from grouplens.org into `archives/`, unzip, then `scripts/build_genome_features.py`)
+- `ml-32m/` — the MovieLens 32M dataset
+
+Optional TMDB poster fetching in the UI: set `VITE_TMDB_KEY` before `docker compose build` to bake a read-only TMDB API key into the SvelteKit bundle. Without it the cards show a placeholder.
+
+See `.env.example` for tunable paths (`MODELS_DIR`, `ML_DATA_DIR`, `CONTENT_FEATURES`, `CACHE_DIR`, `SVD_FILE`, `ALS_FILE`).
+
+### Backend only
+
+```bash
+docker build -t letterboxd-recs-api .
 docker run -p 8000:8000 \
   -v $(pwd)/models:/app/models \
   -v $(pwd)/ml-32m:/app/ml-32m \
   -v $(pwd)/data:/app/data \
-  letterboxd-recs
+  letterboxd-recs-api
 ```
 
-See `.env.example` for tunable paths (`MODELS_DIR`, `ML_DATA_DIR`, `CONTENT_FEATURES`, `CACHE_DIR`).
+Or natively for development:
+
+```bash
+uvicorn src.api.main:app --reload --port 8000
+```
 
 ## Library API
 
@@ -216,17 +239,26 @@ See the individual module docstrings for detailed API documentation:
 - `src.data_enrichment`: TMDB integration and data enrichment
 - `src.reranking`: Phase 1 candidate-gen → re-rank pipeline (`Reranker` is the new public surface)
 - `src.group_reranker`: Group recommendations across 6 strategies
-- `src.content_features`: TF-IDF content scorer (Phase 2)
+- `src.content_features`: Content scorer — Tag Genome 2021 by default, TF-IDF fallback (Phase 2 / 2.5)
 - `src.evaluation`: Offline eval harness (NDCG@k, recall@k, coverage, Gini, intra-list diversity, group fairness)
+- `src.api`: FastAPI app + state singleton + routers (Phase 3)
+- `web/`: SvelteKit frontend (Phase 4)
+
+## Visualization
+
+`scripts/build_movie_space_viz.py` writes `evaluation_results/movie_space_alex.html` — a 3D UMAP projection of the ALS latent space with the user's rated films highlighted and their folded-in taste vector plotted in the same space. Useful for spot-checking why the recommender clusters things the way it does.
 
 ## TODO
 
-- ✅ **Organize!** - Create proper project structure and modular code
-- Create group-prediction capabilities for both SVD and KNN methods
-- Create train/valid/test split and check errors and overfitting over random hyper-parameter search
-- Train on large dataset
-- Organize again!
-- Create Svelte web app wrapper to allow for letterboxd data upload and hook it up to backend prediction
+- ✅ **Organize!** — modular `src/` layout
+- ✅ Group-prediction capabilities for both SVD and KNN methods — `GroupReranker` with 6 strategies including `group_taste_vector`
+- ✅ Train/valid/test split + overfitting detection — `src.model_training.EnhancedModelTrainer`
+- ✅ Train on large dataset — SVD + ALS now on ml-32m (200,948 users × 84,432 items)
+- ✅ Create Svelte web app — SvelteKit in `web/`, deployed via docker compose
+
+Queued upgrades (see `evaluation_results/phase0_findings.md` and the subagent research):
+- Sentence-transformer embeddings on TMDB overview text as a second content scorer
+- Director-id features from IMDb bulk dumps (cinephile-critical signal)
 
 ## Contributing
 
