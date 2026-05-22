@@ -1,0 +1,24 @@
+{
+  "model": "implicit.AlternatingLeastSquares",
+  "version": "0.7.3",
+  "training_dataset": "ml-latest-small/ratings.csv",
+  "factors": 64,
+  "regularization": 0.01,
+  "iterations": 15,
+  "alpha": 40.0,
+  "rating_threshold": 3.5,
+  "confidence_formula": "1 + alpha * (rating - threshold)",
+  "n_users": 609,
+  "n_items": 7363,
+  "n_positive_ratings": 61716,
+  "n_total_ratings": 100836,
+  "training_time_seconds": 0.9,
+  "user_factors_shape": [
+    609,
+    64
+  ],
+  "item_factors_shape": [
+    7363,
+    64
+  ]
+}

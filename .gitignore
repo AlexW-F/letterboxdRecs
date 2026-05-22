@@ -4,7 +4,10 @@ ml-32m.zip
 letterboxd-alexwoof-2025-04-18-19-33-utc.zip
 /alex_data
 /ml-latest-small
-/models
+# Ignore model artifacts but keep model_card.json provenance in git
+/models/*.pkl
+/models/*.npz
+/models/group_testing/
 
 # Virtual environments
 /venv

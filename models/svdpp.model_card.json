@@ -1,0 +1,19 @@
+{
+  "model": "surprise.SVDpp",
+  "file": "svdpp.pkl",
+  "size_mb": 10.5,
+  "training_dataset": "ml-latest-small (NOT ml-32m, despite earlier README claims)",
+  "n_users": 610,
+  "n_items": 9724,
+  "global_mean": 3.501556983616962,
+  "rating_scale": [1, 5],
+  "rating_scale_note": "Trainset was built with Surprise's default Reader(rating_scale=(1, 5)) even though ml-latest-small stores 0.5-step ratings. Surprise retains the actual values in training (a 0.5-star rating goes through as 0.5) but clips predictions to >= 1.0. The Phase 0 fix in src/data_processing.py uses (0.5, 5.0) for future trainings.",
+  "n_factors": 50,
+  "hyperparams_baked_in": {
+    "n_factors": 50,
+    "note": "Exact training hyperparams cannot be recovered post-hoc — only n_factors is visible on the pickle. lr_all and reg_all defaulted to 0.005 and 0.02 per src/config.DEFAULT_SVDPP_PARAMS."
+  },
+  "usage": "Phase 1 candidate generator (secondary). New users handled via ridge-regression fold-in (src/reranking.SVDScorer.fold_in).",
+  "queued_followup": "Retrain on ml-32m for full catalog coverage (87k+ items vs 9.7k). Run scripts/train_als.py-style pipeline but with Surprise SVD++.",
+  "phase": "0_baseline"
+}
