@@ -352,6 +352,7 @@ class Reranker:
         genre_features: Dict[str, Set[str]],
         content_features: Optional[ContentFeatures] = None,
         content_features_extra: Optional[List[ContentFeatures]] = None,
+        content_features_weights: Optional[List[float]] = None,
     ) -> None:
         if svd_scorer is None and als_scorer is None:
             raise ValueError("At least one of svd_scorer / als_scorer is required")
@@ -361,12 +362,21 @@ class Reranker:
         self.genre_features = genre_features
         # All content scorers as a flat list; primary first if both provided.
         # Each operates in its own embedding space (e.g. tag genome vs director
-        # one-hot); the reranker averages their per-candidate normalized scores.
+        # one-hot); the reranker averages per-candidate normalized scores using
+        # per-scorer weights.
         self.content_scorers: List[ContentFeatures] = []
         if content_features is not None:
             self.content_scorers.append(content_features)
         if content_features_extra:
             self.content_scorers.extend(content_features_extra)
+        # Default to equal weights; truncate or pad with 1.0 if mismatched.
+        if content_features_weights is None:
+            self.content_weights = [1.0] * len(self.content_scorers)
+        else:
+            ws = list(content_features_weights)
+            if len(ws) < len(self.content_scorers):
+                ws.extend([1.0] * (len(self.content_scorers) - len(ws)))
+            self.content_weights = ws[: len(self.content_scorers)]
         # Back-compat alias for code that still reads .content (e.g. analyze endpoint).
         self.content = self.content_scorers[0] if self.content_scorers else None
         # Title lookup: movieId -> title
@@ -376,30 +386,31 @@ class Reranker:
         }
 
     def _content_norms(self, user_ratings: Dict[str, float], candidate_ids) -> Dict[str, float]:
-        """Average per-candidate normalized score across all content scorers
-        that can score the user. Empty scorers / no-overlap users contribute
-        nothing; movies not in any scorer's catalog get the neutral default
-        in the caller (0.5)."""
+        """Weighted-average per-candidate normalized score across all
+        content scorers that can score the user. Empty scorers / no-overlap
+        users contribute nothing; movies not in any scorer's catalog get
+        the neutral default (0.5) per scorer to avoid penalizing them for
+        being out-of-coverage."""
         if not self.content_scorers:
             return {}
-        per_scorer: List[Dict[str, float]] = []
-        for cf in self.content_scorers:
+        per_scorer: List[tuple[float, Dict[str, float]]] = []
+        for cf, w in zip(self.content_scorers, self.content_weights):
+            if w <= 0:
+                continue
             taste = cf.taste_vector(user_ratings)
             if taste is None:
                 continue
             raw = cf.score(taste, candidate_ids)
             if raw:
-                per_scorer.append(_minmax(raw))
+                per_scorer.append((w, _minmax(raw)))
         if not per_scorer:
             return {}
-        # Average over scorers that have a value for the candidate. Use 0.5
-        # for missing-from-scorer so a candidate covered by one scorer doesn't
-        # get unfairly penalized vs one covered by multiple.
-        all_keys = set().union(*(d.keys() for d in per_scorer))
+        all_keys = set().union(*(d.keys() for _, d in per_scorer))
+        total_w = sum(w for w, _ in per_scorer)
         out: Dict[str, float] = {}
         for k in all_keys:
-            vals = [d.get(k, 0.5) for d in per_scorer]
-            out[k] = sum(vals) / len(vals)
+            num = sum(w * d.get(k, 0.5) for w, d in per_scorer)
+            out[k] = num / total_w
         return out
 
     # ------------------------------------------------------------------

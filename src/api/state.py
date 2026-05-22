@@ -98,13 +98,23 @@ def load_state() -> ModelState:
                 extra.append(cf)
                 logger.info("loaded extra content features %s: %d movies, %d features",
                             p, cf.tfidf.shape[0], cf.n_features)
-    # No auto-discovery. Director one-hots dilute the genome cosine when
-    # averaged equally and need per-scorer weights to land cleanly.
-    # Opt in via CONTENT_FEATURES_EXTRA=/app/data/content_directors.
+    # Per-scorer weights via env: CONTENT_FEATURES_WEIGHTS="1.0,0.4" parallel
+    # to primary then each extra. Default to 1.0 across the board.
+    extra_weights: list[float] = []
+    weight_env = os.getenv("CONTENT_FEATURES_WEIGHTS", "").strip()
+    if weight_env:
+        parsed = [float(x.strip()) for x in weight_env.split(",") if x.strip()]
+        # First weight is for the primary; remainder for extras.
+        content_weights = parsed
+    elif content is not None:
+        content_weights = [1.0] + [1.0] * len(extra)
+    else:
+        content_weights = [1.0] * len(extra)
 
     reranker = Reranker(svd, als, popularity, movies_df, genre_features,
                         content_features=content,
-                        content_features_extra=extra)
+                        content_features_extra=extra,
+                        content_features_weights=content_weights or None)
     group_reranker = GroupReranker(reranker)
 
     cache = Cache(str(cache_dir))
