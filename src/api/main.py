@@ -20,7 +20,10 @@ from __future__ import annotations
 import hashlib
 import io
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from diskcache import Cache
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
@@ -89,21 +92,76 @@ def _hash_csv(payload: bytes) -> str:
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()
 
 
+def _enrich_with_tmdb(
+    df: pd.DataFrame, cache: "Cache", api_key: str, max_workers: int = 16
+) -> pd.DataFrame:
+    """For each row missing a tmdb_id, search TMDB and fill it in.
+
+    Uses a content-addressable per-(name,year) cache so previous lookups
+    are reused — re-uploads of overlapping watchlists are nearly free.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from ..data_enrichment import extract_year_from_title, search_tmdb_for_movie
+
+    if "tmdb_id" not in df.columns:
+        df = df.copy()
+        df["tmdb_id"] = pd.NA
+
+    def lookup(name: str, year: Optional[int]) -> Optional[int]:
+        key = f"tmdb_search::{name}::{year or ''}"
+        if key in cache:
+            return cache[key]
+        tid = search_tmdb_for_movie(name, year=year, api_key=api_key)
+        cache[key] = tid
+        return tid
+
+    to_fetch: list[int] = []
+    args: list[tuple[str, Optional[int]]] = []
+    for idx, row in df.iterrows():
+        if pd.notna(row.get("tmdb_id")):
+            continue
+        name = str(row.get("Name") or row.get("name") or "").strip()
+        if not name:
+            continue
+        year = row.get("Year")
+        try:
+            year_int: Optional[int] = int(year) if pd.notna(year) else None
+        except (TypeError, ValueError):
+            year_int = extract_year_from_title(name)
+        to_fetch.append(idx)
+        args.append((name, year_int))
+
+    if not to_fetch:
+        return df
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        results = list(pool.map(lambda a: lookup(*a), args))
+
+    for idx, tid in zip(to_fetch, results):
+        if tid is not None:
+            df.at[idx, "tmdb_id"] = tid
+    return df
+
+
 def _ratings_csv_to_movielens(
-    payload: bytes, links_df: pd.DataFrame
+    payload: bytes, links_df: pd.DataFrame, cache: "Cache", tmdb_key: Optional[str]
 ) -> tuple[dict[str, float], int, int]:
     df = pd.read_csv(io.BytesIO(payload))
     n_input = len(df)
     rating_col = "Rating" if "Rating" in df.columns else "rating"
     tmdb_col = "tmdb_id" if "tmdb_id" in df.columns else "tmdbId"
     if tmdb_col not in df.columns:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Uploaded CSV is missing a tmdb_id column. The API expects "
-                "Letterboxd exports already enriched with TMDB IDs."
-            ),
-        )
+        if not tmdb_key:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Uploaded CSV is missing a tmdb_id column and the API has no "
+                    "TMDB_API_KEY configured for server-side enrichment. Either set "
+                    "TMDB_API_KEY or pre-enrich the CSV with scripts/add_tmdb_ids.py."
+                ),
+            )
+        df = _enrich_with_tmdb(df, cache, tmdb_key)
+        tmdb_col = "tmdb_id"
     df[tmdb_col] = pd.to_numeric(df[tmdb_col], errors="coerce")
     df = df.dropna(subset=[tmdb_col, rating_col])
     n_with_tmdb = len(df)
@@ -116,11 +174,16 @@ def _ratings_csv_to_movielens(
     )
 
 
-def _watched_csv_to_movielens(payload: bytes, links_df: pd.DataFrame) -> set[str]:
+def _watched_csv_to_movielens(
+    payload: bytes, links_df: pd.DataFrame, cache: "Cache", tmdb_key: Optional[str]
+) -> set[str]:
     df = pd.read_csv(io.BytesIO(payload))
     tmdb_col = "tmdb_id" if "tmdb_id" in df.columns else "tmdbId"
     if tmdb_col not in df.columns:
-        return set()
+        if not tmdb_key:
+            return set()
+        df = _enrich_with_tmdb(df, cache, tmdb_key)
+        tmdb_col = "tmdb_id"
     df[tmdb_col] = pd.to_numeric(df[tmdb_col], errors="coerce")
     df = df.dropna(subset=[tmdb_col])
     df[tmdb_col] = df[tmdb_col].astype(int).astype(str)
@@ -151,13 +214,17 @@ async def upload_letterboxd(
             n_with_tmdb=cached["n_with_tmdb"],
         )
 
-    mapping, n_input, n_with_tmdb = _ratings_csv_to_movielens(ratings_bytes, state.links_df)
+    mapping, n_input, n_with_tmdb = _ratings_csv_to_movielens(
+        ratings_bytes, state.links_df, state.cache, state.tmdb_api_key,
+    )
     watched_ids: set[str] = set()
     if watched is not None:
         watched_bytes = await watched.read()
         if watched_bytes:
             try:
-                watched_ids = _watched_csv_to_movielens(watched_bytes, state.links_df)
+                watched_ids = _watched_csv_to_movielens(
+                    watched_bytes, state.links_df, state.cache, state.tmdb_api_key,
+                )
             except Exception as e:  # noqa: BLE001
                 logger.warning("watched.csv parse failed: %s — proceeding without it", e)
 

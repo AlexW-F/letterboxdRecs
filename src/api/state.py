@@ -15,6 +15,8 @@ from typing import Optional
 import pandas as pd
 from diskcache import Cache
 
+import re
+
 from ..content_features import ContentFeatures
 from ..evaluation import build_genre_features
 from ..group_reranker import GROUP_STRATEGIES, GroupReranker
@@ -40,6 +42,7 @@ class ModelState:
 
     svd_path: Path
     als_path: Path
+    tmdb_api_key: Optional[str] = None
     reranker_modes_set: frozenset = frozenset(MODE_WEIGHTS.keys())
     group_strategies_set: frozenset = frozenset(GROUP_STRATEGIES)
 
@@ -106,6 +109,20 @@ def load_state() -> ModelState:
 
     cache = Cache(str(cache_dir))
 
+    # TMDB key for server-side enrichment of raw Letterboxd uploads.
+    tmdb_key = os.getenv("TMDB_API_KEY")
+    if not tmdb_key:
+        # Fallback: existing scripts/add_tmdb_ids.py used to hardcode one.
+        scaffold = PROJECT_ROOT / "scripts" / "add_tmdb_ids.py"
+        if scaffold.exists():
+            m = re.search(r'TMDB_API_KEY\s*=\s*"([a-f0-9]{20,})"', scaffold.read_text())
+            if m:
+                tmdb_key = m.group(1)
+                logger.info("loaded TMDB key from scripts/add_tmdb_ids.py")
+    if not tmdb_key:
+        logger.warning("no TMDB_API_KEY available — uploads of raw Letterboxd CSVs "
+                       "(without a tmdb_id column) will be rejected")
+
     logger.info("API ready: %d movies, %d users in cache",
                 len(movies_df), len(cache))
     return ModelState(
@@ -120,4 +137,5 @@ def load_state() -> ModelState:
         cache=cache,
         svd_path=svd_path,
         als_path=als_path,
+        tmdb_api_key=tmdb_key,
     )
