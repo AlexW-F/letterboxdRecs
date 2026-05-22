@@ -138,6 +138,9 @@ def main() -> int:
     p.add_argument("--skip-reranker", action="store_true")
     p.add_argument("--small", action="store_true",
                    help="Evaluate on ml-latest-small instead of ml-32m (Phase 0 comparison)")
+    p.add_argument("--content", type=Path, default=None,
+                   help="Override path to content features (base, without extension). "
+                        "Defaults to data/content_features.")
     args = p.parse_args()
 
     if args.small:
@@ -158,9 +161,9 @@ def main() -> int:
     popularity = PopularityModel(ratings_df)
     genre_features = build_genre_features(movies_df)
     catalog_size = movies_df["movieId"].nunique()
-    content_path = PROJECT_ROOT / "data" / "content_features"
+    content_path = args.content or (PROJECT_ROOT / "data" / "content_features")
     content_features = ContentFeatures.load(content_path) if content_path.with_suffix(".npz").exists() else None
-    print(f"  content features loaded: {content_features is not None}")
+    print(f"  content features loaded from {content_path}: {content_features is not None}")
 
     title_to_id: Dict[str, str] = {}
     for mid, title in zip(movies_df["movieId"].astype(str), movies_df["title"]):

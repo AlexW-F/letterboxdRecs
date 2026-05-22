@@ -7,7 +7,7 @@ services:
     environment:
       MODELS_DIR: /app/models
       ML_DATA_DIR: /app/ml-32m
-      CONTENT_FEATURES: /app/data/content_features
+      CONTENT_FEATURES: /app/data/${CONTENT_FEATURES_NAME:-content_genome}
       CACHE_DIR: /app/.api_cache
       SVD_FILE: ${SVD_FILE:-svd_full_slim.pkl}
       ALS_FILE: ${ALS_FILE:-als_full.pkl}

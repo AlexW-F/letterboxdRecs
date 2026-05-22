@@ -28,15 +28,17 @@ from src.reranking import (
     SVDScorer,
 )
 
-OUTPUT = PROJECT_ROOT / "evaluation_results" / "human_eval_phase2.md"
-METRICS = PROJECT_ROOT / "evaluation_results" / "phase2_eval.json"
+import os
+
+OUTPUT = PROJECT_ROOT / "evaluation_results" / os.getenv("REPORT_NAME", "human_eval_phase2_5.md")
+METRICS = PROJECT_ROOT / "evaluation_results" / os.getenv("METRICS_NAME", "phase2_5_genome_eval.json")
 
 SVD_PATH = PROJECT_ROOT / "models" / "svd_full.pkl"
 ALS_PATH = PROJECT_ROOT / "models" / "als_full.pkl"
 MOVIES_PATH = PROJECT_ROOT / "ml-32m" / "movies.csv"
 RATINGS_PATH = PROJECT_ROOT / "ml-32m" / "ratings.csv"
 LINKS_PATH = PROJECT_ROOT / "ml-32m" / "links.csv"
-CONTENT_PATH = PROJECT_ROOT / "data" / "content_features"
+CONTENT_PATH = PROJECT_ROOT / "data" / os.getenv("CONTENT_NAME", "content_genome")
 
 
 def main() -> int:
@@ -86,11 +88,11 @@ def main() -> int:
     ]
 
     out: list[str] = []
-    out.append("# Phase 2 Human-Eval Check-in — content features added")
+    out.append("# Phase 2.5 Human-Eval Check-in — Tag Genome 2021 content features")
     out.append("")
-    out.append("**Purpose:** scan a sample of individual and group recommendations after adding the Phase 2 content scorer. The new term blends TF-IDF cosine similarity (over ml-32m's 2M user-generated tags + genres) into the re-rank score. The offline metrics tell us if it improved (table at the bottom), but only you can say if it makes the picks feel more *yours*.")
+    out.append("**Purpose:** the content scorer is now Tag Genome 2021 — GroupLens's curated, deep-learning-fitted tag-relevance dataset (1,084 tags × 9,734 movies, 10.5M relevance scores in [0, 1]). Drop-in replacement for the noisy user-tag TF-IDF. Offline metrics show clear gains on group strategies (the headline use case) and mixed-to-flat on individual modes; qualitative output is the better signal here.")
     out.append("")
-    out.append("**Models:** `models/svd_full.pkl` + `models/als_full.pkl` + `data/content_features.npz` — all built on ml-32m (87k items, 200k users, 20k-vocab TF-IDF over tags+genres).")
+    out.append("**Models:** `models/svd_full_slim.pkl` (SVD on ml-32m, trainset slimmed for inference) + `models/als_full.pkl` (implicit ALS on ml-32m) + `data/content_genome.npz` (Tag Genome 2021).")
     out.append(f"**User:** `alex_data/ratings_with_tmdb.csv` ({len(real_user)} ratings mapped to MovieLens 32m, plus {len(watched_only)} watched-but-unrated films also excluded from recs).")
     out.append(f"**Synthetic friends:** two random MovieLens users with {len(friend_a)} and {len(friend_b)} ratings respectively.")
     out.append("")

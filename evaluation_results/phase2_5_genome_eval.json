@@ -1,0 +1,240 @@
+{
+  "phase": "1_reranker",
+  "model": {
+    "svd": "svd_full.pkl",
+    "als": "als_full.pkl"
+  },
+  "dataset": "ml-latest-small",
+  "config": {
+    "top_n": 50,
+    "holdout_frac": 0.2,
+    "n_individual_users": 21,
+    "n_group_members": 3
+  },
+  "reranker": {
+    "individual": {
+      "balanced": {
+        "n_users": 21,
+        "n_holdout_total": 1201,
+        "top_n": 50,
+        "ndcg_at_10": 0.1785039136222175,
+        "ndcg_at_50": 0.17752579885594577,
+        "recall_at_10": 0.061292233480442784,
+        "recall_at_50": 0.1428275449222382,
+        "catalog_coverage_at_50": 0.010287149626077526,
+        "gini_popularity_at_50": 0.8105095649109225,
+        "intra_list_diversity_at_10": 0.8236607572321859,
+        "extras": {}
+      },
+      "niche": {
+        "n_users": 21,
+        "n_holdout_total": 1201,
+        "top_n": 50,
+        "ndcg_at_10": 0.062132893518239106,
+        "ndcg_at_50": 0.06750928243074618,
+        "recall_at_10": 0.018403170691500208,
+        "recall_at_50": 0.07239986882507507,
+        "catalog_coverage_at_50": 0.01057258663013073,
+        "gini_popularity_at_50": 0.8683637885629522,
+        "intra_list_diversity_at_10": 0.8122298094321905,
+        "extras": {}
+      },
+      "popular": {
+        "n_users": 21,
+        "n_holdout_total": 1201,
+        "top_n": 50,
+        "ndcg_at_10": 0.26608243549201127,
+        "ndcg_at_50": 0.2891223719356672,
+        "recall_at_10": 0.1205256980676833,
+        "recall_at_50": 0.266356978133127,
+        "catalog_coverage_at_50": 0.007501284466518239,
+        "gini_popularity_at_50": 0.5173209641925268,
+        "intra_list_diversity_at_10": 0.7675266649869827,
+        "extras": {}
+      },
+      "serendipitous": {
+        "n_users": 21,
+        "n_holdout_total": 1201,
+        "top_n": 50,
+        "ndcg_at_10": 0.1527950480677962,
+        "ndcg_at_50": 0.17178397121239922,
+        "recall_at_10": 0.041170906548384775,
+        "recall_at_50": 0.1427451205429663,
+        "catalog_coverage_at_50": 0.01012730490380773,
+        "gini_popularity_at_50": 0.8068820027550896,
+        "intra_list_diversity_at_10": 0.9017073472005444,
+        "extras": {}
+      }
+    },
+    "group": {
+      "average": {
+        "balanced": {
+          "strategy": "average",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.07662644498938471,
+          "fairness_cv_at_10": 0.796457311571756,
+          "avg_per_member_recall_at_50": 0.19130434782608696,
+          "intra_list_diversity_at_10": 0.5544444444444445,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.7607489150857519,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "average",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.0,
+          "intra_list_diversity_at_10": 0.6403703703703705,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.47390513833992093,
+          "extras": {}
+        }
+      },
+      "least_misery": {
+        "balanced": {
+          "strategy": "least_misery",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.025976559406213937,
+          "fairness_cv_at_10": 1.4142135623730951,
+          "avg_per_member_recall_at_50": 0.031159420289855074,
+          "intra_list_diversity_at_10": 0.5944444444444446,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.8988001808481779,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "least_misery",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.0,
+          "intra_list_diversity_at_10": 0.675925925925926,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.7369134668381407,
+          "extras": {}
+        }
+      },
+      "most_pleasure": {
+        "balanced": {
+          "strategy": "most_pleasure",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.26680991090018075,
+          "fairness_cv_at_10": 0.1323194763184442,
+          "avg_per_member_recall_at_50": 0.19130434782608696,
+          "intra_list_diversity_at_10": 0.5775396825396826,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.6824104043243352,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "most_pleasure",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.03087890441745338,
+          "fairness_cv_at_10": 1.4142135623730951,
+          "avg_per_member_recall_at_50": 0.05000000000000001,
+          "intra_list_diversity_at_10": 0.656613756613757,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.9154588954684428,
+          "extras": {}
+        }
+      },
+      "consensus": {
+        "balanced": {
+          "strategy": "consensus",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.032688360707128085,
+          "fairness_cv_at_10": 1.010442106002445,
+          "avg_per_member_recall_at_50": 0.15797101449275364,
+          "intra_list_diversity_at_10": 0.6192592592592594,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.792486109520912,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "consensus",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.0,
+          "intra_list_diversity_at_10": 0.6496296296296298,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.4762490087232355,
+          "extras": {}
+        }
+      },
+      "hybrid": {
+        "balanced": {
+          "strategy": "hybrid",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.03330134394459536,
+          "fairness_cv_at_10": 0.9851662197426745,
+          "avg_per_member_recall_at_50": 0.11014492753623188,
+          "intra_list_diversity_at_10": 0.6396296296296298,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.8116123585925422,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "hybrid",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.0,
+          "intra_list_diversity_at_10": 0.6462962962962965,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.4554022988505747,
+          "extras": {}
+        }
+      },
+      "group_taste_vector": {
+        "balanced": {
+          "strategy": "group_taste_vector",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.008333333333333333,
+          "intra_list_diversity_at_10": 0.813289241622575,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.7922369857611696,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "group_taste_vector",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.0,
+          "intra_list_diversity_at_10": 0.8156966490299824,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.8287311411992263,
+          "extras": {}
+        }
+      }
+    }
+  }
+}

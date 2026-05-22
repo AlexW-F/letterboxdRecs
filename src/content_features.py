@@ -92,6 +92,48 @@ class ContentFeatures:
     n_features: int
 
     @classmethod
+    def from_genome(
+        cls,
+        genome_scores_df: pd.DataFrame,
+        *,
+        movie_col: str = "item_id",
+        tag_col: str = "tag",
+        score_col: str = "score",
+    ) -> "ContentFeatures":
+        """Build a ContentFeatures from the Tag Genome 2021 long-form scores.
+
+        The standalone genome-2021 dataset (``movie_dataset_public_final/scores/tagdl.csv``)
+        is laid out as ``tag, item_id, score`` triples where ``tag`` is the
+        literal tag string and ``score`` is the deep-learning-fitted relevance
+        in [0, 1]. We treat each unique tag as its own vocabulary entry.
+
+        Output matrix is sparse-CSR, L2-normalized rows so cosine collapses
+        to dot product (matching the existing TF-IDF contract).
+        """
+        scores = genome_scores_df.dropna(subset=[movie_col, tag_col, score_col])
+        # Stable orderings so the index_of map is reproducible.
+        movie_ids = np.array(sorted(scores[movie_col].astype(np.int64).unique()), dtype=np.int64)
+        unique_tags = sorted(scores[tag_col].astype(str).unique())
+        mid_to_row = {int(m): i for i, m in enumerate(movie_ids)}
+        tag_to_col = {t: i for i, t in enumerate(unique_tags)}
+
+        rows = scores[movie_col].astype(np.int64).map(mid_to_row).values
+        cols = scores[tag_col].astype(str).map(tag_to_col).values
+        data = scores[score_col].astype(np.float32).values
+        n_movies = len(movie_ids)
+        n_tags = len(unique_tags)
+        matrix = csr_matrix((data, (rows, cols)), shape=(n_movies, n_tags), dtype=np.float32)
+        matrix = sk_normalize(matrix, norm="l2", axis=1)
+
+        return cls(
+            tfidf=matrix,
+            movie_ids=movie_ids,
+            vocabulary=list(unique_tags),
+            index_of={str(int(m)): i for i, m in enumerate(movie_ids)},
+            n_features=n_tags,
+        )
+
+    @classmethod
     def from_dataframes(
         cls,
         movies_df: pd.DataFrame,
