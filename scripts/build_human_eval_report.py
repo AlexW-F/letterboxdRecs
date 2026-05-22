@@ -27,15 +27,21 @@ from src.reranking import (
     SVDScorer,
 )
 
-OUTPUT = PROJECT_ROOT / "evaluation_results" / "human_eval_phase1.md"
-METRICS = PROJECT_ROOT / "evaluation_results" / "phase1_eval.json"
+OUTPUT = PROJECT_ROOT / "evaluation_results" / "human_eval_phase1_full.md"
+METRICS = PROJECT_ROOT / "evaluation_results" / "phase1_eval_full.json"
+
+SVD_PATH = PROJECT_ROOT / "models" / "svd_full.pkl"
+ALS_PATH = PROJECT_ROOT / "models" / "als_full.pkl"
+MOVIES_PATH = PROJECT_ROOT / "ml-32m" / "movies.csv"
+RATINGS_PATH = PROJECT_ROOT / "ml-32m" / "ratings.csv"
+LINKS_PATH = PROJECT_ROOT / "ml-32m" / "links.csv"
 
 
 def main() -> int:
-    svd = SVDScorer.from_path(PROJECT_ROOT / "models" / "svdpp.pkl")
-    als = ALSScorer.from_path(PROJECT_ROOT / "models" / "als_small.pkl")
-    movies = pd.read_csv(PROJECT_ROOT / "ml-latest-small" / "movies.csv")
-    ratings = pd.read_csv(PROJECT_ROOT / "ml-latest-small" / "ratings.csv")
+    svd = SVDScorer.from_path(SVD_PATH)
+    als = ALSScorer.from_path(ALS_PATH)
+    movies = pd.read_csv(MOVIES_PATH)
+    ratings = pd.read_csv(RATINGS_PATH)
     pop = PopularityModel(ratings)
     gf = build_genre_features(movies)
     rr = Reranker(svd, als, pop, movies, gf)
@@ -43,7 +49,7 @@ def main() -> int:
 
     real_user = load_user_data_with_tmdb(
         str(PROJECT_ROOT / "alex_data" / "ratings_with_tmdb.csv"),
-        str(PROJECT_ROOT / "ml-latest-small" / "links.csv"),
+        str(LINKS_PATH),
     )
     ratings["userId"] = ratings["userId"].astype(int)
     ratings["movieId"] = ratings["movieId"].astype(str)
@@ -66,16 +72,13 @@ def main() -> int:
     members = [("alex", real_user, None), ("friend_A", friend_a, None), ("friend_B", friend_b, None)]
 
     out: list[str] = []
-    out.append("# Phase 1 Human-Eval Check-in")
+    out.append("# Phase 1 Human-Eval Check-in — ml-32m (full catalog)")
     out.append("")
-    out.append("**Purpose:** before locking in the Phase 1 re-ranker weights, "
-               "scan a sample of individual and group recommendations and flag any "
-               "that look off. The offline metrics tell us the re-ranker improved "
-               "(see the table at the bottom), but only you can say if the *vibes* are right.")
+    out.append("**Purpose:** scan a sample of individual and group recommendations and flag anything that looks off. The offline metrics say the re-ranker improved (table at the bottom), but only you can say if the *vibes* are right.")
     out.append("")
-    out.append("Models used: `models/svdpp.pkl` (ml-latest-small) + `models/als_small.pkl` (ml-latest-small).")
-    out.append(f"User: `alex_data/ratings_with_tmdb.csv` ({len(real_user)} ratings mapped to MovieLens).")
-    out.append(f"Synthetic friends: two random MovieLens users with {len(friend_a)} and {len(friend_b)} ratings respectively.")
+    out.append("**Models:** `models/svd_full.pkl` + `models/als_full.pkl` — both trained on **ml-32m** (87k items, 200k users). This replaces the Phase 1 initial run on ml-latest-small.")
+    out.append(f"**User:** `alex_data/ratings_with_tmdb.csv` ({len(real_user)} ratings mapped to MovieLens 32m).")
+    out.append(f"**Synthetic friends:** two random MovieLens users with {len(friend_a)} and {len(friend_b)} ratings respectively.")
     out.append("")
     out.append("---")
     out.append("")

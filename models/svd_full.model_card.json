@@ -1,0 +1,18 @@
+{
+  "model": "surprise.SVD",
+  "training_dataset": "ml-32m/ratings.csv",
+  "n_users": 200948,
+  "n_items": 84432,
+  "global_mean": 3.5403956487277393,
+  "rating_scale": [
+    0.5,
+    5.0
+  ],
+  "n_factors": 64,
+  "n_epochs": 20,
+  "lr_all": 0.005,
+  "reg_all": 0.02,
+  "training_time_seconds": 143.1,
+  "size_mb": 1037.8,
+  "note": "Replaces models/svdpp.pkl (ml-latest-small only). Plain SVD chosen over SVD++ to keep training tractable on ml-32m without a GPU; SVD captures the bulk of the quality."
+}

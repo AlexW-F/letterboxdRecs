@@ -21,6 +21,9 @@ __pycache__/
 # FastAPI runtime cache (content-addressable upload cache)
 /.api_cache
 
+# Claude Code session metadata
+/.claude
+
 # Web app
 /web/node_modules
 /web/.svelte-kit

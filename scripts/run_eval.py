@@ -42,12 +42,20 @@ from src.reranking import (
 )
 
 
-SVDPP_PATH = PROJECT_ROOT / "models" / "svdpp.pkl"
-ALS_PATH = PROJECT_ROOT / "models" / "als_small.pkl"
-RATINGS_PATH = PROJECT_ROOT / "ml-latest-small" / "ratings.csv"
-MOVIES_PATH = PROJECT_ROOT / "ml-latest-small" / "movies.csv"
-LINKS_PATH = PROJECT_ROOT / "ml-latest-small" / "links.csv"
+SVDPP_PATH = PROJECT_ROOT / "models" / "svd_full.pkl"
+ALS_PATH = PROJECT_ROOT / "models" / "als_full.pkl"
+RATINGS_PATH = PROJECT_ROOT / "ml-32m" / "ratings.csv"
+MOVIES_PATH = PROJECT_ROOT / "ml-32m" / "movies.csv"
+LINKS_PATH = PROJECT_ROOT / "ml-32m" / "links.csv"
 RATINGS_TMDB_PATH = PROJECT_ROOT / "alex_data" / "ratings_with_tmdb.csv"
+
+# Fallback paths for ml-latest-small if the user wants to compare against the
+# Phase 1 baseline run, exposed via --small flag below.
+SVDPP_SMALL = PROJECT_ROOT / "models" / "svdpp.pkl"
+ALS_SMALL = PROJECT_ROOT / "models" / "als_small.pkl"
+RATINGS_SMALL = PROJECT_ROOT / "ml-latest-small" / "ratings.csv"
+MOVIES_SMALL = PROJECT_ROOT / "ml-latest-small" / "movies.csv"
+LINKS_SMALL = PROJECT_ROOT / "ml-latest-small" / "links.csv"
 
 
 def load_eval_users(
@@ -124,10 +132,20 @@ def main() -> int:
     p.add_argument("--top-n", type=int, default=50)
     p.add_argument("--holdout-frac", type=float, default=0.2)
     p.add_argument("--output", type=Path,
-                   default=PROJECT_ROOT / "evaluation_results" / "phase1_eval.json")
+                   default=PROJECT_ROOT / "evaluation_results" / "phase1_eval_full.json")
     p.add_argument("--skip-baseline", action="store_true")
     p.add_argument("--skip-reranker", action="store_true")
+    p.add_argument("--small", action="store_true",
+                   help="Evaluate on ml-latest-small instead of ml-32m (Phase 0 comparison)")
     args = p.parse_args()
+
+    if args.small:
+        global SVDPP_PATH, ALS_PATH, RATINGS_PATH, MOVIES_PATH, LINKS_PATH
+        SVDPP_PATH = SVDPP_SMALL
+        ALS_PATH = ALS_SMALL
+        RATINGS_PATH = RATINGS_SMALL
+        MOVIES_PATH = MOVIES_SMALL
+        LINKS_PATH = LINKS_SMALL
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
