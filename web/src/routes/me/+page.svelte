@@ -102,11 +102,15 @@
 	{#if !hash}
 		<div class="rounded-lg bg-white/5 border border-white/10 p-4 space-y-3 max-w-lg">
 			<FileDropzone
-				label="ratings.csv (TMDB-enriched)"
+				label="ratings.csv"
 				bind:file={ratingsFile}
-				hint="with tmdb_id column"
+				hint="from your Letterboxd export — TMDB enrichment happens server-side (~15s first time)"
 			/>
-			<FileDropzone label="watched.csv (optional)" bind:file={watchedFile} />
+			<FileDropzone
+				label="watched.csv (optional)"
+				bind:file={watchedFile}
+				hint="excludes watched-but-unrated films from recs"
+			/>
 			{#if error}
 				<p class="text-sm text-red-400">{error}</p>
 			{/if}
@@ -116,8 +120,14 @@
 				disabled={busy}
 				class="w-full px-4 py-2 rounded bg-emerald-500 text-emerald-950 font-medium hover:bg-emerald-400 disabled:bg-emerald-700/50"
 			>
-				{busy ? 'working…' : 'Upload + recommend'}
+				{busy ? 'uploading + enriching + recommending…' : 'Upload + recommend'}
 			</button>
+			{#if busy}
+				<p class="text-xs text-white/40">
+					First time around, the backend looks up each film on TMDB (~15s for a typical
+					Letterboxd export). Cached after that.
+				</p>
+			{/if}
 		</div>
 	{:else}
 		<div class="rounded-lg bg-white/5 border border-white/10 p-4 space-y-4">
