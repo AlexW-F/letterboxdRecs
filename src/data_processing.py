@@ -33,8 +33,13 @@ def load_movielens_data(ratings_path: str, movies_path: str, links_path: str = N
     """
     logger.info("Loading MovieLens data...")
     
-    # Load for Surprise
-    reader = Reader(line_format="user item rating timestamp", sep=",", skip_lines=1)
+    # Load for Surprise. ml-32m uses 0.5-step ratings (0.5..5.0); Letterboxd
+    # exports are also 0.5-step. Surprise's default rating_scale=(1,5) would
+    # clip *predictions* to >=1.0 (training values pass through fine), which
+    # is harmless for ranking but cosmetic in user-facing "predicted star"
+    # output. We set the true scale here and in create_surprise_dataset.
+    reader = Reader(line_format="user item rating timestamp", sep=",",
+                    skip_lines=1, rating_scale=(0.5, 5.0))
     surprise_data = Dataset.load_from_file(ratings_path, reader=reader)
     
     # Load as pandas DataFrames
@@ -201,8 +206,10 @@ def create_surprise_dataset(ratings_df: pd.DataFrame) -> Dataset:
         # DataFrame already has required columns
         processed_df = ratings_df[required_columns].copy()
     
-    # Define rating scale
-    reader = Reader(rating_scale=(1, 5))
+    # 0.5-step rating scale matches MovieLens 32M and Letterboxd exports;
+    # config.MIN_RATING / MAX_RATING agree. Surprise will clip predictions
+    # to this range; training data passes through unchanged.
+    reader = Reader(rating_scale=(0.5, 5.0))
     
     # Create dataset
     dataset = Dataset.load_from_df(processed_df, reader)

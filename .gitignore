@@ -5,3 +5,20 @@ letterboxd-alexwoof-2025-04-18-19-33-utc.zip
 /alex_data
 /ml-latest-small
 /models
+
+# Virtual environments
+/venv
+/venv311
+
+# Python build artifacts
+__pycache__/
+*.pyc
+*.egg-info/
+
+# FastAPI runtime cache (content-addressable upload cache)
+/.api_cache
+
+# Web app
+/web/node_modules
+/web/.svelte-kit
+/web/build

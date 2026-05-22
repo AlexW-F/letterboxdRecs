@@ -1,30 +1,15 @@
 """
 Recommendation generation utilities for letterboxdRecs.
 
-This module contains functions for:
-- Generating recommendations for new users
-- Handling user-based and item-based collabora        # Process user ratings
-        Q_rows = []
-        y = []
-        
-        for movie_id, rating in user_ratings.items():
-            # Ensure movie_id is the same type as used in the trainset
-            try:
-                inner_i = self.trainset.to_inner_iid(movie_id)
-            except ValueError:
-                # Try with string conversion if direct lookup fails
-                try:
-                    inner_i = self.trainset.to_inner_iid(str(movie_id))
-                    movie_id = str(movie_id)  # Use string version
-                except ValueError:
-                    continue  # Movie not in training set
-                
-            q_i = self.model.qi[inner_i]
-            target = rating - mu - bi[movie_id]
-            
-            Q_rows.append(q_i)
-            y.append(target) SVD++ fold-in for new users
-- Filtering recommendations by user preferences
+This module contains:
+- RecommendationEngine: top-N recommendations for individual users using a
+  trained SVD/SVD++ or KNN model, with ridge-regression fold-in for users
+  whose ratings were not in the original training set.
+- load_user_data_with_tmdb: helper that joins a Letterboxd CSV (enriched
+  with TMDB IDs) to MovieLens via links.csv, producing a {movieId: rating}
+  dict consumable by the engine.
+
+Group recommendations live in src/group_recommendations.py.
 """
 
 import numpy as np
@@ -32,6 +17,8 @@ import pandas as pd
 import pickle
 from typing import Dict, List, Tuple, Optional
 import logging
+
+from .config import DEFAULT_K_NEIGHBORS, DEFAULT_FOLD_IN_REG
 
 logger = logging.getLogger(__name__)
 
@@ -124,11 +111,11 @@ class RecommendationEngine:
                 
         return recommendations
     
-    def _knn_recommendations(self, user_ratings: Dict[str, float], 
+    def _knn_recommendations(self, user_ratings: Dict[str, float],
                            movies_df: pd.DataFrame,
                            top_n: int = 10,
                            exclude_watched: bool = True,
-                           k: int = 40) -> List[Tuple[str, float]]:
+                           k: int = DEFAULT_K_NEIGHBORS) -> List[Tuple[str, float]]:
         """Generate recommendations using KNN-based model."""
         
         sim_matrix = self.model.sim
@@ -184,7 +171,7 @@ class RecommendationEngine:
                 
         return recommendations
     
-    def _fold_in_user(self, user_ratings: Dict[str, float], reg: float = 0.1) -> np.ndarray:
+    def _fold_in_user(self, user_ratings: Dict[str, float], reg: float = DEFAULT_FOLD_IN_REG) -> np.ndarray:
         """
         Fold in a new user for SVD-based models using ridge regression.
         
@@ -315,12 +302,17 @@ def load_user_data_with_tmdb(ratings_path: str, links_path: str) -> Dict[str, fl
     rating_col = 'Rating' if 'Rating' in user_df.columns else 'rating'
     tmdb_col = 'tmdb_id' if 'tmdb_id' in user_df.columns else 'tmdbId'
     
-    # Convert types to ensure proper merging
-    user_df[tmdb_col] = user_df[tmdb_col].astype(float)
+    # Normalize TMDB IDs identically on both sides. Both CSVs store the id
+    # as a float (with ".0" suffix); naive astype(str) on one side and
+    # int->str on the other produces "862.0" vs "862" and the merge yields
+    # zero rows. Drop NaNs on both sides, then coerce through int->str.
+    user_df[tmdb_col] = pd.to_numeric(user_df[tmdb_col], errors="coerce")
     user_df = user_df.dropna(subset=[tmdb_col])
     user_df[tmdb_col] = user_df[tmdb_col].astype(int).astype(str)
-    
-    links_df['tmdbId'] = links_df['tmdbId'].astype(str)
+
+    links_df['tmdbId'] = pd.to_numeric(links_df['tmdbId'], errors="coerce")
+    links_df = links_df.dropna(subset=['tmdbId'])
+    links_df['tmdbId'] = links_df['tmdbId'].astype(int).astype(str)
     links_df['movieId'] = links_df['movieId'].astype(str)
     
     # Merge to get MovieLens IDs
