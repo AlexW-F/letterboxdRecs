@@ -1,0 +1,322 @@
+{
+  "phase": "1_reranker",
+  "model": {
+    "svd": "svd_full.pkl",
+    "als": "als_full.pkl"
+  },
+  "dataset": "ml-latest-small",
+  "config": {
+    "top_n": 50,
+    "holdout_frac": 0.2,
+    "n_individual_users": 21,
+    "n_group_members": 3
+  },
+  "baseline": {
+    "individual": {
+      "n_users": 21,
+      "n_holdout_total": 1201,
+      "top_n": 50,
+      "ndcg_at_10": 0.0,
+      "ndcg_at_50": 0.01671000058127516,
+      "recall_at_10": 0.0,
+      "recall_at_50": 0.024304145961396136,
+      "catalog_coverage_at_50": 0.010035965062510704,
+      "gini_popularity_at_50": 0.7378035019650906,
+      "intra_list_diversity_at_10": 0.7715465692449819,
+      "extras": {}
+    },
+    "group": {
+      "average": {
+        "strategy": "average",
+        "n_members": 3,
+        "n_holdout_total": 97,
+        "top_n": 50,
+        "avg_per_member_ndcg_at_10": 0.0,
+        "fairness_cv_at_10": 0.0,
+        "avg_per_member_recall_at_50": 0.0,
+        "intra_list_diversity_at_10": 0.7696296296296297,
+        "catalog_coverage_at_50": 0.0005708740081064109,
+        "gini_popularity_at_50": 0.6991689369318252,
+        "extras": {}
+      },
+      "least_misery": {
+        "strategy": "least_misery",
+        "n_members": 3,
+        "n_holdout_total": 97,
+        "top_n": 50,
+        "avg_per_member_ndcg_at_10": 0.0,
+        "fairness_cv_at_10": 0.0,
+        "avg_per_member_recall_at_50": 0.0,
+        "intra_list_diversity_at_10": 0.7955555555555555,
+        "catalog_coverage_at_50": 0.0005708740081064109,
+        "gini_popularity_at_50": 0.6972795197339066,
+        "extras": {}
+      },
+      "most_pleasure": {
+        "strategy": "most_pleasure",
+        "n_members": 3,
+        "n_holdout_total": 97,
+        "top_n": 50,
+        "avg_per_member_ndcg_at_10": 0.0,
+        "fairness_cv_at_10": 0.0,
+        "avg_per_member_recall_at_50": 0.0,
+        "intra_list_diversity_at_10": 0.5259259259259259,
+        "catalog_coverage_at_50": 0.0005708740081064109,
+        "gini_popularity_at_50": 0.7398045216046296,
+        "extras": {}
+      },
+      "consensus": {
+        "strategy": "consensus",
+        "n_members": 3,
+        "n_holdout_total": 97,
+        "top_n": 50,
+        "avg_per_member_ndcg_at_10": 0.0,
+        "fairness_cv_at_10": 0.0,
+        "avg_per_member_recall_at_50": 0.0,
+        "intra_list_diversity_at_10": 0.7466666666666667,
+        "catalog_coverage_at_50": 0.0005708740081064109,
+        "gini_popularity_at_50": 0.7716261728192731,
+        "extras": {}
+      },
+      "hybrid": {
+        "strategy": "hybrid",
+        "n_members": 3,
+        "n_holdout_total": 97,
+        "top_n": 50,
+        "avg_per_member_ndcg_at_10": 0.0,
+        "fairness_cv_at_10": 0.0,
+        "avg_per_member_recall_at_50": 0.0,
+        "intra_list_diversity_at_10": 0.6607407407407407,
+        "catalog_coverage_at_50": 0.0005708740081064109,
+        "gini_popularity_at_50": 0.7716261728192731,
+        "extras": {}
+      }
+    }
+  },
+  "reranker": {
+    "individual": {
+      "balanced": {
+        "n_users": 21,
+        "n_holdout_total": 1201,
+        "top_n": 50,
+        "ndcg_at_10": 0.20233940771766296,
+        "ndcg_at_50": 0.18440334050142063,
+        "recall_at_10": 0.07575240840860958,
+        "recall_at_50": 0.1397461435999363,
+        "catalog_coverage_at_50": 0.010207227264942628,
+        "gini_popularity_at_50": 0.8020628057822646,
+        "intra_list_diversity_at_10": 0.815460080777541,
+        "extras": {}
+      },
+      "niche": {
+        "n_users": 21,
+        "n_holdout_total": 1201,
+        "top_n": 50,
+        "ndcg_at_10": 0.061734118813518576,
+        "ndcg_at_50": 0.07963232368346718,
+        "recall_at_10": 0.014535971637965757,
+        "recall_at_50": 0.08116996239259242,
+        "catalog_coverage_at_50": 0.010538334189644345,
+        "gini_popularity_at_50": 0.8975929612013607,
+        "intra_list_diversity_at_10": 0.8127630805408584,
+        "extras": {}
+      },
+      "popular": {
+        "n_users": 21,
+        "n_holdout_total": 1201,
+        "top_n": 50,
+        "ndcg_at_10": 0.2763096573452875,
+        "ndcg_at_50": 0.29007700273052994,
+        "recall_at_10": 0.12216191554241011,
+        "recall_at_50": 0.2645932571423223,
+        "catalog_coverage_at_50": 0.0075241194268424955,
+        "gini_popularity_at_50": 0.5158602201087576,
+        "intra_list_diversity_at_10": 0.7554955068447132,
+        "extras": {}
+      },
+      "serendipitous": {
+        "n_users": 21,
+        "n_holdout_total": 1201,
+        "top_n": 50,
+        "ndcg_at_10": 0.19566374200078804,
+        "ndcg_at_50": 0.19030460183662407,
+        "recall_at_10": 0.07522403535076706,
+        "recall_at_50": 0.14515190523547283,
+        "catalog_coverage_at_50": 0.009910372780727294,
+        "gini_popularity_at_50": 0.798271477452155,
+        "intra_list_diversity_at_10": 0.9109836860460442,
+        "extras": {}
+      }
+    },
+    "group": {
+      "average": {
+        "balanced": {
+          "strategy": "average",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.050649885583170774,
+          "fairness_cv_at_10": 0.7109287421790045,
+          "avg_per_member_recall_at_50": 0.07282608695652174,
+          "intra_list_diversity_at_10": 0.6100000000000001,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.8264857741754679,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "average",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.0,
+          "intra_list_diversity_at_10": 0.6274074074074076,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.34761028416779427,
+          "extras": {}
+        }
+      },
+      "least_misery": {
+        "balanced": {
+          "strategy": "least_misery",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.008333333333333333,
+          "intra_list_diversity_at_10": 0.5403703703703704,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.9086691035474592,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "least_misery",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.0,
+          "intra_list_diversity_at_10": 0.6077777777777779,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.459822340661781,
+          "extras": {}
+        }
+      },
+      "most_pleasure": {
+        "balanced": {
+          "strategy": "most_pleasure",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.21076180625021831,
+          "fairness_cv_at_10": 0.49116621669078486,
+          "avg_per_member_recall_at_50": 0.16231884057971016,
+          "intra_list_diversity_at_10": 0.6146031746031748,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.6894504435232237,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "most_pleasure",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.02389118171643786,
+          "fairness_cv_at_10": 1.4142135623730947,
+          "avg_per_member_recall_at_50": 0.05000000000000001,
+          "intra_list_diversity_at_10": 0.8172222222222222,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.905881011881275,
+          "extras": {}
+        }
+      },
+      "consensus": {
+        "balanced": {
+          "strategy": "consensus",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.04565217391304347,
+          "intra_list_diversity_at_10": 0.6144444444444445,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.8501941225734678,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "consensus",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.0,
+          "intra_list_diversity_at_10": 0.6274074074074076,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.32811272416737836,
+          "extras": {}
+        }
+      },
+      "hybrid": {
+        "balanced": {
+          "strategy": "hybrid",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.04565217391304347,
+          "intra_list_diversity_at_10": 0.5781481481481482,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.8529902871750772,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "hybrid",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.0,
+          "intra_list_diversity_at_10": 0.6544444444444449,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.3301966372185808,
+          "extras": {}
+        }
+      },
+      "group_taste_vector": {
+        "balanced": {
+          "strategy": "group_taste_vector",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.008333333333333333,
+          "intra_list_diversity_at_10": 0.8453174603174602,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.8196330165516262,
+          "extras": {}
+        },
+        "niche": {
+          "strategy": "group_taste_vector",
+          "n_members": 3,
+          "n_holdout_total": 97,
+          "top_n": 50,
+          "avg_per_member_ndcg_at_10": 0.0,
+          "fairness_cv_at_10": 0.0,
+          "avg_per_member_recall_at_50": 0.0,
+          "intra_list_diversity_at_10": 0.882768959435626,
+          "catalog_coverage_at_50": 0.0005708740081064109,
+          "gini_popularity_at_50": 0.4600848506275411,
+          "extras": {}
+        }
+      }
+    }
+  }
+}

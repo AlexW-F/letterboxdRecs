@@ -46,6 +46,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 
 from .config import COLD_START_MIN_OVERLAP, DEFAULT_CANDIDATE_POOL_SIZE
+from .content_features import ContentFeatures
 
 
 # ---------------------------------------------------------------------------
@@ -93,27 +94,27 @@ class ModeWeights:
 MODE_WEIGHTS: Dict[str, ModeWeights] = {
     # "balanced_discovery" — mid-popularity, decent diversity, sane floor.
     # popularity_penalty pulls noticeably away from blockbusters so this
-    # diverges from `popular` in the top-K.
+    # diverges from `popular` in the top-K. Content term blends semantic
+    # tag/genre similarity into the score.
     "balanced": ModeWeights(svd=1.0, als=1.0, popularity_penalty=0.7,
                             implicit_bonus=0.5, diversity_penalty=0.4,
-                            min_rating_count=50),
-    # "hidden_gems" / "niche": strong popularity penalty, but still require
-    # enough ratings to filter out the long-tail-noise picks
-    # (single-user-rated-5 movies) the user flagged.
+                            content=0.6, min_rating_count=50),
+    # "hidden_gems" / "niche": strong popularity penalty + minimum rating
+    # count, plus a heavier content weight so picks are at least
+    # semantically aligned with what the user likes.
     "niche": ModeWeights(svd=0.7, als=1.0, popularity_penalty=1.5,
                          implicit_bonus=0.6, diversity_penalty=0.3,
-                         min_rating_count=30),
-    # Mainstream-friendly: significant popularity *bonus*. SVD weighted up
-    # because SVD is trained on "what the crowd likes" — exactly the popular
-    # signal. Lower diversity weight lets clusters of classics stay together.
+                         content=0.9, min_rating_count=30),
+    # Mainstream-friendly: popularity bonus, SVD-heavy, less content
+    # influence (popular picks already overlap obvious tag clusters).
     "popular": ModeWeights(svd=1.4, als=1.0, popularity_penalty=-0.8,
                            implicit_bonus=0.3, diversity_penalty=0.15,
-                           min_rating_count=200),
-    # Serendipitous: highest diversity weight; we still need enough ratings
-    # to call something a genuine surprise rather than a single-rater spike.
+                           content=0.3, min_rating_count=200),
+    # Serendipitous: highest diversity weight, real content signal so
+    # "surprise" stays *adjacent* to taste rather than fully random.
     "serendipitous": ModeWeights(svd=0.6, als=0.9, popularity_penalty=0.7,
                                  implicit_bonus=0.7, diversity_penalty=1.0,
-                                 min_rating_count=25),
+                                 content=0.7, min_rating_count=25),
 }
 
 
@@ -349,6 +350,7 @@ class Reranker:
         popularity: PopularityModel,
         movies_df: pd.DataFrame,
         genre_features: Dict[str, Set[str]],
+        content_features: Optional[ContentFeatures] = None,
     ) -> None:
         if svd_scorer is None and als_scorer is None:
             raise ValueError("At least one of svd_scorer / als_scorer is required")
@@ -356,6 +358,7 @@ class Reranker:
         self.als = als_scorer
         self.popularity = popularity
         self.genre_features = genre_features
+        self.content = content_features
         # Title lookup: movieId -> title
         self.titles: Dict[str, str] = {
             str(mid): title
@@ -372,16 +375,31 @@ class Reranker:
         watched_movies: Optional[Iterable[str]] = None,
         n_per_source: int = DEFAULT_CANDIDATE_POOL_SIZE,
         min_rating_count: int = 0,
+        exclude_rated: bool = True,
+        exclude_watched: bool = True,
     ) -> Tuple[Set[str], Dict[str, float], Dict[str, float]]:
         """Union top-N candidates from each scorer; return (candidates, svd_scores, als_scores).
 
-        Excludes movies the user has already rated or watched. If
-        ``min_rating_count`` > 0, drops candidates with fewer than that
-        many ratings in the trainset — a guard against single-rater-noise
-        long-tail items that confuse the niche/balanced modes.
+        ``exclude_rated`` (default True) drops movies in ``user_ratings`` from
+        the candidate pool — the usual "don't recommend movies I've already
+        scored" semantic.
+
+        ``exclude_watched`` (default True) drops movies in ``watched_movies``
+        from candidates. Set to False when you want recs from the
+        watched-but-unrated set ("films I've seen but never rated — surface
+        them so I can decide if I liked them").
+
+        Either way, ``watched_movies`` is still fed as positive implicit
+        feedback to the ALS scorer.
+
+        ``min_rating_count`` > 0 drops candidates with fewer than that
+        many ratings in the trainset — guard against single-rater-noise
+        long-tail items.
         """
-        exclude = {str(m) for m in user_ratings}
-        if watched_movies:
+        exclude: Set[str] = set()
+        if exclude_rated:
+            exclude |= {str(m) for m in user_ratings}
+        if exclude_watched and watched_movies:
             exclude |= {str(m) for m in watched_movies}
 
         svd_scores = self.svd.score_all(user_ratings) if self.svd else {}
@@ -495,6 +513,14 @@ class Reranker:
                     liked_genres[g] = liked_genres.get(g, 0.0) + (rating - 3.0)
         total_genre_weight = sum(liked_genres.values()) or 1.0
 
+        # Content (TF-IDF cosine) scoring — computed once per user.
+        content_norm: Dict[str, float] = {}
+        if self.content and weights.content > 0:
+            taste = self.content.taste_vector(user_ratings)
+            if taste is not None:
+                content_raw = self.content.score(taste, candidate_ids)
+                content_norm = _minmax(content_raw)
+
         out: Dict[str, float] = {}
         for mid in candidate_ids:
             in_svd = mid in svd_all
@@ -511,7 +537,8 @@ class Reranker:
             else:
                 overlap_norm = 0.0
             imp_term = weights.implicit_bonus * overlap_norm
-            out[mid] = svd_term + als_term - pop_term + imp_term
+            content_term = weights.content * content_norm.get(mid, 0.5)
+            out[mid] = svd_term + als_term - pop_term + imp_term + content_term
         return out
 
     # ------------------------------------------------------------------
@@ -525,6 +552,8 @@ class Reranker:
         mode: str = "balanced",
         top_n: int = 10,
         n_candidates: int = DEFAULT_CANDIDATE_POOL_SIZE,
+        exclude_rated: bool = True,
+        exclude_watched: bool = True,
     ) -> List[ScoredCandidate]:
         weights = MODE_WEIGHTS.get(mode)
         if weights is None:
@@ -537,6 +566,8 @@ class Reranker:
         candidates, svd_scores, als_scores = self.generate_candidates(
             user_ratings, watched_movies, n_per_source=n_candidates,
             min_rating_count=weights.min_rating_count,
+            exclude_rated=exclude_rated,
+            exclude_watched=exclude_watched,
         )
         if not candidates:
             return []
@@ -555,6 +586,14 @@ class Reranker:
                     liked_genres[g] = liked_genres.get(g, 0.0) + (rating - 3.0)
         top_rated_movies.sort(key=lambda kv: kv[1], reverse=True)
 
+        # Content (TF-IDF cosine) scoring — computed once per user.
+        content_norm: Dict[str, float] = {}
+        if self.content and weights.content > 0:
+            taste = self.content.taste_vector(user_ratings)
+            if taste is not None:
+                content_raw = self.content.score(taste, candidates)
+                content_norm = _minmax(content_raw)
+
         # Score each candidate (without diversity yet — diversity is applied iteratively)
         base_scores: Dict[str, Dict[str, float]] = {}
         for mid in candidates:
@@ -569,13 +608,15 @@ class Reranker:
             else:
                 overlap_norm = 0.0
             imp_term = weights.implicit_bonus * overlap_norm
+            content_term = weights.content * content_norm.get(mid, 0.5)
             base_scores[mid] = {
                 "svd": svd_term,
                 "als": als_term,
                 "popularity_penalty": -pop_term,
                 "implicit_bonus": imp_term,
+                "content": content_term,
                 "diversity_penalty": 0.0,  # filled below
-                "base_total": svd_term + als_term - pop_term + imp_term,
+                "base_total": svd_term + als_term - pop_term + imp_term + content_term,
             }
 
         # Greedy MMR: pick highest base score, then iteratively penalize remaining

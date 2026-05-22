@@ -74,6 +74,8 @@ class GroupReranker:
         watched: Optional[Iterable[str]],
         candidates: set,
         mode: str,
+        exclude_rated: bool = True,
+        exclude_watched: bool = True,
     ) -> Tuple[Dict[str, float], Dict[str, float]]:
         """Score an explicit candidate set for this member.
 
@@ -82,10 +84,18 @@ class GroupReranker:
         genuinely cannot score (neither CF model knows them, even though
         another member's model does) are omitted — *not* zero-filled.
         """
+        # score_specific scores whatever explicit candidates are given.
+        # If the caller wants exclusion semantics, they pre-filter the
+        # candidate set — that happens at the union step in `recommend`.
+        kept_candidates = set(candidates)
+        if exclude_rated:
+            kept_candidates -= {str(m) for m in user_ratings}
+        if exclude_watched and watched:
+            kept_candidates -= {str(m) for m in watched}
         scores = self.rr.score_specific(
             user_ratings=user_ratings,
             watched_movies=watched,
-            candidate_ids=candidates,
+            candidate_ids=kept_candidates,
             mode=mode,
         )
         return scores, {}
@@ -132,6 +142,8 @@ class GroupReranker:
         members: List[Tuple[str, Dict[str, float], Optional[Iterable[str]]]],
         mode: str,
         top_n: int,
+        exclude_rated: bool = True,
+        exclude_watched: bool = True,
     ) -> List[GroupScoredCandidate]:
         """Merge all members' positive ratings into one super-user and run
         the reranker against that. Aggregate per-member scores afterwards
@@ -161,6 +173,8 @@ class GroupReranker:
             watched_movies=fused_watched,
             mode=mode,
             top_n=top_n * 3,  # over-request so we can still compute fairness
+            exclude_rated=exclude_rated,
+            exclude_watched=exclude_watched,
         )
         if not fused_recs:
             return []
@@ -202,6 +216,8 @@ class GroupReranker:
         mode: str = "balanced",
         top_n: int = 10,
         fairness_weight: float = 0.5,
+        exclude_rated: bool = True,
+        exclude_watched: bool = True,
     ) -> List[GroupScoredCandidate]:
         """``members`` is a list of (name, ratings_dict, watched_iter_or_none)."""
         if strategy not in GROUP_STRATEGIES:
@@ -212,7 +228,10 @@ class GroupReranker:
             return []
 
         if strategy == "group_taste_vector":
-            return self._group_taste_vector_recommend(members, mode=mode, top_n=top_n)
+            return self._group_taste_vector_recommend(
+                members, mode=mode, top_n=top_n,
+                exclude_rated=exclude_rated, exclude_watched=exclude_watched,
+            )
 
         # 1) Each member proposes candidates via the reranker (post-rerank top-N).
         per_member_top: Dict[str, List[ScoredCandidate]] = {}
@@ -220,6 +239,8 @@ class GroupReranker:
             per_member_top[name] = self.rr.recommend(
                 user_ratings=ratings, watched_movies=watched,
                 mode=mode, top_n=top_n * 5,
+                exclude_rated=exclude_rated,
+                exclude_watched=exclude_watched,
             )
 
         # 2) Candidate union — anything any member ranked into their top-(5N).
@@ -230,7 +251,10 @@ class GroupReranker:
         # 3) For each member, expand to score every candidate (no zero-fill).
         per_member_scores: Dict[str, Dict[str, float]] = {}
         for name, ratings, watched in members:
-            scores, _ = self._score_member_over_union(ratings, watched, union_ids, mode)
+            scores, _ = self._score_member_over_union(
+                ratings, watched, union_ids, mode,
+                exclude_rated=exclude_rated, exclude_watched=exclude_watched,
+            )
             per_member_scores[name] = scores
 
         # 4) Normalize per-member scores into [0, 1] so different members'

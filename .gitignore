@@ -21,6 +21,9 @@ __pycache__/
 # FastAPI runtime cache (content-addressable upload cache)
 /.api_cache
 
+# Derived content-features matrix (regenerable via scripts/build_content_features.py)
+/data
+
 # Claude Code session metadata
 /.claude
 

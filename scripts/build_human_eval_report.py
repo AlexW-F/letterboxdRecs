@@ -16,6 +16,7 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.content_features import ContentFeatures
 from src.evaluation import build_genre_features
 from src.group_reranker import GROUP_STRATEGIES, GroupReranker
 from src.recommendations import load_user_data_with_tmdb, load_watched_movies_with_tmdb
@@ -27,14 +28,15 @@ from src.reranking import (
     SVDScorer,
 )
 
-OUTPUT = PROJECT_ROOT / "evaluation_results" / "human_eval_phase1_full.md"
-METRICS = PROJECT_ROOT / "evaluation_results" / "phase1_eval_full.json"
+OUTPUT = PROJECT_ROOT / "evaluation_results" / "human_eval_phase2.md"
+METRICS = PROJECT_ROOT / "evaluation_results" / "phase2_eval.json"
 
 SVD_PATH = PROJECT_ROOT / "models" / "svd_full.pkl"
 ALS_PATH = PROJECT_ROOT / "models" / "als_full.pkl"
 MOVIES_PATH = PROJECT_ROOT / "ml-32m" / "movies.csv"
 RATINGS_PATH = PROJECT_ROOT / "ml-32m" / "ratings.csv"
 LINKS_PATH = PROJECT_ROOT / "ml-32m" / "links.csv"
+CONTENT_PATH = PROJECT_ROOT / "data" / "content_features"
 
 
 def main() -> int:
@@ -44,7 +46,8 @@ def main() -> int:
     ratings = pd.read_csv(RATINGS_PATH)
     pop = PopularityModel(ratings)
     gf = build_genre_features(movies)
-    rr = Reranker(svd, als, pop, movies, gf)
+    content = ContentFeatures.load(CONTENT_PATH) if CONTENT_PATH.with_suffix(".npz").exists() else None
+    rr = Reranker(svd, als, pop, movies, gf, content_features=content)
     gr = GroupReranker(rr)
 
     real_user = load_user_data_with_tmdb(
@@ -83,11 +86,11 @@ def main() -> int:
     ]
 
     out: list[str] = []
-    out.append("# Phase 1 Human-Eval Check-in — ml-32m (full catalog)")
+    out.append("# Phase 2 Human-Eval Check-in — content features added")
     out.append("")
-    out.append("**Purpose:** scan a sample of individual and group recommendations and flag anything that looks off. The offline metrics say the re-ranker improved (table at the bottom), but only you can say if the *vibes* are right.")
+    out.append("**Purpose:** scan a sample of individual and group recommendations after adding the Phase 2 content scorer. The new term blends TF-IDF cosine similarity (over ml-32m's 2M user-generated tags + genres) into the re-rank score. The offline metrics tell us if it improved (table at the bottom), but only you can say if it makes the picks feel more *yours*.")
     out.append("")
-    out.append("**Models:** `models/svd_full.pkl` + `models/als_full.pkl` — both trained on **ml-32m** (87k items, 200k users). This replaces the Phase 1 initial run on ml-latest-small.")
+    out.append("**Models:** `models/svd_full.pkl` + `models/als_full.pkl` + `data/content_features.npz` — all built on ml-32m (87k items, 200k users, 20k-vocab TF-IDF over tags+genres).")
     out.append(f"**User:** `alex_data/ratings_with_tmdb.csv` ({len(real_user)} ratings mapped to MovieLens 32m, plus {len(watched_only)} watched-but-unrated films also excluded from recs).")
     out.append(f"**Synthetic friends:** two random MovieLens users with {len(friend_a)} and {len(friend_b)} ratings respectively.")
     out.append("")
@@ -168,13 +171,14 @@ def main() -> int:
 
     out.append("---")
     out.append("")
-    out.append("## What I want your eye on")
+    out.append("## What I want your eye on (Phase 2)")
     out.append("")
-    out.append("1. **Modes:** does `niche` feel niche (would you describe these as 'hidden gems' you don't already know)? Does `popular` lean too mainstream, or about right? Are `serendipitous` picks delightful-surprising or random-noise?")
-    out.append("2. **Group strategies:** `group_taste_vector` is the new 6th — finding movies the fused taste vector predicts highly, not just averaging the individual predictions. Does it surface movies that feel like *the group's* picks?")
-    out.append("3. **Explanations:** the 'Genre overlap' column shows the top genres in your rated set that match the recommendation. Does this 'why' make sense, or feel post-hoc?")
-    out.append("4. **The friends in this demo are random MovieLens users with mismatched taste.** A real friend group would have far more overlap. If something looks weird, ask whether it's the algorithm or the mismatched test friends.")
-    out.append("5. **Anything missing?** The point of the Phase 1 check-in is to surface things the offline metrics can't catch. Examples of valid feedback: 'all the niche picks are 70s/80s, I want more recent', 'the explanations should mention specific movies not just genres', 'cold-start fallback fires too aggressively'.")
+    out.append("1. **Content alignment:** the new content term uses 2M user-generated tags from ml-32m, so each rec is now scored partly on tag/genre similarity to your rated films. Do the modes feel more 'yours' than the Phase 1 version (e.g. world cinema, Ghibli, anime, classic noir clusters showing up if your taste pulls there)?")
+    out.append("2. **Modes:** `niche` should now be hidden-gems-with-substance rather than long-tail noise. `serendipitous` should be delightful jumps that still rhyme with your taste. Are they?")
+    out.append("3. **Group strategies:** `group_taste_vector` fuses everyone's taste tags into one signal. Does it find movies your group would *actually* watch together, not just compromise picks?")
+    out.append("4. **Explanations / 'why' column:** does showing 'Genre overlap' help you trust the rec, or is it too coarse — would you want top-3 contributing rated films named?")
+    out.append("5. **The friends in this demo are random MovieLens users with mismatched taste.** A real friend group would have far more overlap; if something looks weird, ask whether it's the algorithm or the mismatched test friends.")
+    out.append("6. **Anything missing?** Examples of valid feedback: 'I want the content scorer weighted higher in balanced', 'niche picks too many 70s/80s — would be nice to filter by decade', 'tag noise still slipping through (e.g. tags like \"01 10\")'.")
     out.append("")
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)

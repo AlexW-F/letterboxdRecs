@@ -24,6 +24,7 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.content_features import ContentFeatures
 from src.evaluation import (
     build_genre_features,
     build_item_popularity,
@@ -132,7 +133,7 @@ def main() -> int:
     p.add_argument("--top-n", type=int, default=50)
     p.add_argument("--holdout-frac", type=float, default=0.2)
     p.add_argument("--output", type=Path,
-                   default=PROJECT_ROOT / "evaluation_results" / "phase1_eval_full.json")
+                   default=PROJECT_ROOT / "evaluation_results" / "phase2_eval.json")
     p.add_argument("--skip-baseline", action="store_true")
     p.add_argument("--skip-reranker", action="store_true")
     p.add_argument("--small", action="store_true",
@@ -157,6 +158,9 @@ def main() -> int:
     popularity = PopularityModel(ratings_df)
     genre_features = build_genre_features(movies_df)
     catalog_size = movies_df["movieId"].nunique()
+    content_path = PROJECT_ROOT / "data" / "content_features"
+    content_features = ContentFeatures.load(content_path) if content_path.with_suffix(".npz").exists() else None
+    print(f"  content features loaded: {content_features is not None}")
 
     title_to_id: Dict[str, str] = {}
     for mid, title in zip(movies_df["movieId"].astype(str), movies_df["title"]):
@@ -224,10 +228,11 @@ def main() -> int:
                   f"  div={rpt.intra_list_diversity_at_10:.4f}")
         out["baseline"] = {"individual": b_indiv.to_dict(), "group": baseline_group}
 
-    # ---- Reranker (Phase 1) ----
+    # ---- Reranker (Phase 1/2) ----
     if not args.skip_reranker:
-        print("\n--- Reranker: SVD++ + ALS + popularity + diversity ---")
-        rr = Reranker(svd_scorer, als_scorer, popularity, movies_df, genre_features)
+        print("\n--- Reranker: SVD + ALS + popularity + diversity + content (P2) ---")
+        rr = Reranker(svd_scorer, als_scorer, popularity, movies_df, genre_features,
+                      content_features=content_features)
         gr = GroupReranker(rr)
 
         rerank_indiv: Dict[str, Dict] = {}
