@@ -1,5 +1,11 @@
 # letterboxdRecs
 
+## COLLABORATIVE FILTERING RECOMMENDATION ENGINE
+• Implemented multiple algorithm support including KNN (Basic, WithMeans, Baseline) and SVD-based (SVD, SVD++) collaborative filtering
+• Built comprehensive hyperparameter search with early stopping and overfitting detection across 50+ parameter combinations  
+• Architected train/validation/test splits with robust evaluation metrics for model comparison
+• Optimized recommendation generation using matrix factorization fold-in techniques for new users
+
 A collaborative filtering recommendation system that combines MovieLens community data with personal Letterboxd ratings to generate personalized movie recommendations.
 
 ## Features
@@ -166,13 +172,52 @@ for model, metrics in cv_results.items():
 - **SVD**: Singular Value Decomposition matrix factorization
 - **SVD++**: Enhanced SVD with implicit feedback
 
-## API Documentation
+## REST API
+
+Phase 3 added a FastAPI backend. After training the models (`scripts/train_svd.py`, `scripts/train_als.py`) and building content features (`scripts/build_content_features.py`):
+
+```bash
+uvicorn src.api.main:app --reload --port 8000
+```
+
+OpenAPI docs at `http://localhost:8000/docs`. Endpoints:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | service + model-loaded status |
+| `GET /modes` | list of recommendation modes (`balanced`, `niche`, `popular`, `serendipitous`) with descriptions + weight breakdown |
+| `GET /strategies` | list of group strategies (`average`, `least_misery`, `most_pleasure`, `consensus`, `hybrid`, `group_taste_vector`) |
+| `POST /upload-letterboxd` | upload `ratings_with_tmdb.csv` (+ optional `watched_with_tmdb.csv`). Returns a SHA-256 content hash that doubles as a session id. |
+| `POST /recommend/individual` | `{hash, mode, top_n, exclude_rated?, exclude_watched?}` → top-N recs with per-rec explanations |
+| `POST /recommend/group` | `{hashes, member_names?, strategy, mode, top_n}` → group recs with per-member scores + fairness |
+| `POST /group/analyze` | `{hashes, member_names?}` → pairwise similarity (Pearson on shared ratings + cosine on TF-IDF taste vectors), consensus and disagreement films |
+
+Caching is content-addressable — re-uploading the same export hits the same diskcache entry, no session lifecycle.
+
+### Running in Docker
+
+```bash
+docker build -t letterboxd-recs .
+docker run -p 8000:8000 \
+  -v $(pwd)/models:/app/models \
+  -v $(pwd)/ml-32m:/app/ml-32m \
+  -v $(pwd)/data:/app/data \
+  letterboxd-recs
+```
+
+See `.env.example` for tunable paths (`MODELS_DIR`, `ML_DATA_DIR`, `CONTENT_FEATURES`, `CACHE_DIR`).
+
+## Library API
 
 See the individual module docstrings for detailed API documentation:
 - `src.data_processing`: Data loading and preprocessing utilities
 - `src.model_training`: Model training and evaluation
 - `src.recommendations`: Recommendation generation engine
 - `src.data_enrichment`: TMDB integration and data enrichment
+- `src.reranking`: Phase 1 candidate-gen → re-rank pipeline (`Reranker` is the new public surface)
+- `src.group_reranker`: Group recommendations across 6 strategies
+- `src.content_features`: TF-IDF content scorer (Phase 2)
+- `src.evaluation`: Offline eval harness (NDCG@k, recall@k, coverage, Gini, intra-list diversity, group fairness)
 
 ## TODO
 
