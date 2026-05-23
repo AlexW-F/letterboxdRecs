@@ -7,6 +7,7 @@
 	const links = [
 		{ href: '/', label: 'Group' },
 		{ href: '/me', label: 'Solo' },
+		{ href: '/explore', label: 'Movie space' },
 		{ href: '/about', label: 'About' }
 	];
 </script>
