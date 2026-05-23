@@ -16,6 +16,11 @@
 	let hoveredTitle = $state<string | null>(null);
 	let hoveredGenre = $state<string | null>(null);
 
+	// Sparse labels for the few films closest to the moving camera.
+	let labels = $state<
+		Array<{ title: string; x: number; y: number; opacity: number; id: string }>
+	>([]);
+
 	let cleanup: (() => void) | null = null;
 
 	onMount(async () => {
@@ -40,15 +45,12 @@
 		});
 		renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 		renderer.setSize(container.clientWidth, container.clientHeight, false);
-		// Background transparent so the page gradients show through.
 		renderer.setClearColor(0x000000, 0);
 		container.appendChild(renderer.domElement);
 		renderer.domElement.style.cssText =
 			'width: 100%; height: 100%; display: block; touch-action: none; cursor: grab;';
 
 		const scene = new THREE.Scene();
-		// Fog the same color as the page background so distant points dissolve
-		// into the void instead of popping at the far plane.
 		scene.fog = new THREE.Fog(0x0a0c10, 18, 80);
 
 		const camera = new THREE.PerspectiveCamera(
@@ -60,7 +62,7 @@
 		camera.position.set(0, 0, 0);
 
 		// ---------------------------------------------------------------
-		// Center + scale the cloud so the camera path stays inside it.
+		// Center + scale the cloud
 		// ---------------------------------------------------------------
 		const raw = data.coords;
 		let cx = 0, cy = 0, cz = 0;
@@ -82,33 +84,28 @@
 			if (r2 > maxR) maxR = r2;
 		}
 		maxR = Math.sqrt(maxR);
-		const scale = 28 / maxR; // cloud radius ~28 units around origin
+		const scale = 28 / maxR;
 
-		const positions = new Float32Array(raw.length * 3);
-		const colors = new Float32Array(raw.length * 3);
-		const sizes = new Float32Array(raw.length);
+		const n = raw.length;
+		const positions = new Float32Array(n * 3);
+		const colors = new Float32Array(n * 3);
+		const sizes = new Float32Array(n);
+		const seeds = new Float32Array(n);
 
 		const c = new THREE.Color();
-		// Per-star seed (0..1) for twinkle phase offset.
-		const seeds = new Float32Array(raw.length);
-
-		// Slight per-point size variation by popularity gives the cloud a
-		// near-field / far-field star feel; popular films are visibly larger.
 		const popMax = Math.max(...data.popularity);
-		for (let i = 0; i < raw.length; i++) {
+		for (let i = 0; i < n; i++) {
 			positions[3 * i] = (raw[i][0] - cx) * scale;
 			positions[3 * i + 1] = (raw[i][1] - cy) * scale;
 			positions[3 * i + 2] = (raw[i][2] - cz) * scale;
 			const hex = data.genre_colors[data.genres[i]] ?? '#cccccc';
 			c.set(hex);
-			// Saturate colors so they read against the dark scene.
 			const hsl = { h: 0, s: 0, l: 0 };
 			c.getHSL(hsl);
 			c.setHSL(hsl.h, Math.min(1, hsl.s * 1.4 + 0.1), Math.max(0.55, Math.min(0.75, hsl.l)));
 			colors[3 * i] = c.r;
 			colors[3 * i + 1] = c.g;
 			colors[3 * i + 2] = c.b;
-			// Size scales loosely with log(popularity); range ~0.55–2.6.
 			const popN = Math.log1p(data.popularity[i]) / Math.log1p(popMax);
 			sizes[i] = 0.55 + popN * 2.05;
 			seeds[i] = Math.random();
@@ -121,9 +118,7 @@
 		geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
 
 		// ---------------------------------------------------------------
-		// Galaxy-star shader — bright core + wide exponential halo, with
-		// per-star twinkle, depth fade, and additive blending so dense
-		// regions naturally bloom brighter.
+		// Star shader (galaxy core + halo)
 		// ---------------------------------------------------------------
 		const starMaterial = new THREE.ShaderMaterial({
 			uniforms: {
@@ -144,11 +139,8 @@
 					vColor = color;
 					vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
 					vDist = -mvPosition.z;
-					// Smoothly modulate per-star brightness 0.7..1.15 with a low-
-					// frequency sinusoid offset by the star's own seed.
 					vTwinkle = 0.85 + 0.30 * sin(uTime * 1.3 + aSeed * 18.0);
 					gl_Position = projectionMatrix * mvPosition;
-					// Bigger close stars — divide by depth, clamp by GPU limit.
 					gl_PointSize = uSize * aSize * uPixelRatio / max(2.0, -mvPosition.z);
 				}
 			`,
@@ -157,26 +149,15 @@
 				varying float vDist;
 				varying float vTwinkle;
 				void main() {
-					// 0 at center, 1 at the edge of the point square.
 					vec2 d = gl_PointCoord - 0.5;
 					float r = length(d) * 2.0;
 					if (r > 1.0) discard;
-
-					// Wide soft halo: rapid exponential falloff. This is what
-					// gives the galaxy-glow when many overlap.
 					float halo = exp(-r * 3.4);
-
-					// Tight bright core: highly peaked near r=0.
 					float core = pow(1.0 - r, 7.0);
-
-					// Whiten the core a touch — real stars look hotter at center.
 					vec3 col = mix(vColor, vec3(1.0), core * 0.55);
 					float intensity = (halo * 0.75 + core * 2.2) * vTwinkle;
-
-					// Depth fade so distant stars dissolve into the fog.
 					float depthFade = 1.0 - smoothstep(22.0, 72.0, vDist);
 					intensity *= 0.45 + 0.55 * depthFade;
-
 					gl_FragColor = vec4(col * intensity, intensity);
 				}
 			`,
@@ -185,13 +166,10 @@
 			transparent: true,
 			vertexColors: true
 		});
-
 		const stars = new THREE.Points(geometry, starMaterial);
 		scene.add(stars);
 
-		// Second pass — much bigger, softer points for the diffuse glow
-		// around dense regions. Together with additive blending this is
-		// what turns "scatter plot" into "galaxy".
+		// Diffuse-glow pass
 		const glowMaterial = new THREE.ShaderMaterial({
 			uniforms: {
 				uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
@@ -219,9 +197,6 @@
 					vec2 d = gl_PointCoord - 0.5;
 					float r = length(d) * 2.0;
 					if (r > 1.0) discard;
-					// Pure exponential, very soft — invisible at the edges, faintly
-					// tinted near the center. Many overlapping copies blend into
-					// dust lanes.
 					float glow = exp(-r * 5.0) * 0.18;
 					float depthFade = 1.0 - smoothstep(25.0, 80.0, vDist);
 					glow *= 0.4 + 0.6 * depthFade;
@@ -233,32 +208,128 @@
 			transparent: true,
 			vertexColors: true
 		});
-
 		const glow = new THREE.Points(geometry, glowMaterial);
 		scene.add(glow);
 
 		// ---------------------------------------------------------------
-		// Pick: raycaster for hover tooltips
+		// k-NN connection lines — the "galactic web" texture. Computed
+		// once at init: each star connects to its 2 nearest neighbors if
+		// they're within MAX_LINK_DIST. Filter ensures sparse regions
+		// stay sparse and dense clusters web together.
 		// ---------------------------------------------------------------
-		const raycaster = new THREE.Raycaster();
-		// Threshold (in world units) makes screen-space hover forgiving.
-		raycaster.params.Points = { threshold: 0.65 };
-		const pointer = new THREE.Vector2(-2, -2); // off-screen by default
+		const K_LINKS = 2;
+		const MAX_LINK_DIST = 1.9; // world units; cloud scaled radius ~28
+		const MAX_LINK_DIST_SQ = MAX_LINK_DIST * MAX_LINK_DIST;
+
+		const tmpPairs: Array<[number, number, number]> = []; // [i, j, distSq]
+		for (let i = 0; i < n; i++) {
+			let best1 = -1, best2 = -1, bd1 = Infinity, bd2 = Infinity;
+			const xi = positions[3 * i],
+				yi = positions[3 * i + 1],
+				zi = positions[3 * i + 2];
+			for (let j = 0; j < n; j++) {
+				if (i === j) continue;
+				const dx = xi - positions[3 * j],
+					dy = yi - positions[3 * j + 1],
+					dz = zi - positions[3 * j + 2];
+				const d2 = dx * dx + dy * dy + dz * dz;
+				if (d2 > MAX_LINK_DIST_SQ) continue;
+				if (d2 < bd1) {
+					bd2 = bd1;
+					best2 = best1;
+					bd1 = d2;
+					best1 = j;
+				} else if (d2 < bd2) {
+					bd2 = d2;
+					best2 = j;
+				}
+			}
+			if (best1 >= 0 && i < best1) tmpPairs.push([i, best1, bd1]);
+			if (K_LINKS >= 2 && best2 >= 0 && i < best2) tmpPairs.push([i, best2, bd2]);
+		}
+
+		const segs = tmpPairs.length;
+		const linePositions = new Float32Array(segs * 2 * 3);
+		const lineColors = new Float32Array(segs * 2 * 3);
+		const lineSeeds = new Float32Array(segs * 2);
+		for (let s = 0; s < segs; s++) {
+			const [i, j] = tmpPairs[s];
+			linePositions[s * 6 + 0] = positions[3 * i];
+			linePositions[s * 6 + 1] = positions[3 * i + 1];
+			linePositions[s * 6 + 2] = positions[3 * i + 2];
+			linePositions[s * 6 + 3] = positions[3 * j];
+			linePositions[s * 6 + 4] = positions[3 * j + 1];
+			linePositions[s * 6 + 5] = positions[3 * j + 2];
+			// Blend the two endpoint colors so each segment shifts naturally
+			// along its length (genre A -> genre B gradients).
+			lineColors[s * 6 + 0] = colors[3 * i];
+			lineColors[s * 6 + 1] = colors[3 * i + 1];
+			lineColors[s * 6 + 2] = colors[3 * i + 2];
+			lineColors[s * 6 + 3] = colors[3 * j];
+			lineColors[s * 6 + 4] = colors[3 * j + 1];
+			lineColors[s * 6 + 5] = colors[3 * j + 2];
+			const seed = Math.random();
+			lineSeeds[s * 2] = seed;
+			lineSeeds[s * 2 + 1] = seed;
+		}
+
+		const lineGeo = new THREE.BufferGeometry();
+		lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+		lineGeo.setAttribute('color', new THREE.BufferAttribute(lineColors, 3));
+		lineGeo.setAttribute('aSeed', new THREE.BufferAttribute(lineSeeds, 1));
+
+		const lineMaterial = new THREE.ShaderMaterial({
+			uniforms: { uTime: { value: 0 } },
+			vertexShader: /* glsl */ `
+				attribute float aSeed;
+				varying vec3 vColor;
+				varying float vDist;
+				varying float vPulse;
+				uniform float uTime;
+				void main() {
+					vColor = color;
+					vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+					vDist = -mvPosition.z;
+					// Each link has its own pulse phase via aSeed; both endpoints
+					// share the seed so the whole segment lights together.
+					vPulse = 0.4 + 0.6 * (0.5 + 0.5 * sin(uTime * 0.55 + aSeed * 7.3));
+					gl_Position = projectionMatrix * mvPosition;
+				}
+			`,
+			fragmentShader: /* glsl */ `
+				varying vec3 vColor;
+				varying float vDist;
+				varying float vPulse;
+				void main() {
+					float depthFade = 1.0 - smoothstep(14.0, 55.0, vDist);
+					float a = 0.10 * depthFade * vPulse;
+					gl_FragColor = vec4(vColor * 0.85, a);
+				}
+			`,
+			blending: THREE.AdditiveBlending,
+			depthWrite: false,
+			transparent: true,
+			vertexColors: true
+		});
+
+		const links = new THREE.LineSegments(lineGeo, lineMaterial);
+		scene.add(links);
 
 		// ---------------------------------------------------------------
-		// Interaction state
+		// Pick
+		// ---------------------------------------------------------------
+		const raycaster = new THREE.Raycaster();
+		raycaster.params.Points = { threshold: 0.65 };
+		const pointer = new THREE.Vector2(-2, -2);
+
+		// ---------------------------------------------------------------
+		// Interaction
 		// ---------------------------------------------------------------
 		let isDragging = false;
-		let dragX = 0;
-		let dragY = 0;
-		// User-applied look rotations on top of the auto camera path.
-		let yaw = 0;
-		let pitch = 0;
-		// Pointer-following parallax (subtle).
-		let parallaxX = 0;
-		let parallaxY = 0;
-		let targetParallaxX = 0;
-		let targetParallaxY = 0;
+		let dragX = 0, dragY = 0;
+		let yaw = 0, pitch = 0;
+		let parallaxX = 0, parallaxY = 0;
+		let targetParallaxX = 0, targetParallaxY = 0;
 
 		function onPointerDown(e: PointerEvent) {
 			isDragging = true;
@@ -278,16 +349,13 @@
 			const ny = (e.clientY - rect.top) / rect.height;
 			pointer.x = nx * 2 - 1;
 			pointer.y = -(ny * 2 - 1);
-
 			targetParallaxX = pointer.x * 0.25;
 			targetParallaxY = pointer.y * 0.18;
-
 			if (isDragging) {
 				const dx = e.clientX - dragX;
 				const dy = e.clientY - dragY;
 				yaw -= dx * 0.005;
 				pitch -= dy * 0.004;
-				// Clamp pitch so we don't flip.
 				pitch = Math.max(-0.85, Math.min(0.85, pitch));
 				dragX = e.clientX;
 				dragY = e.clientY;
@@ -306,9 +374,7 @@
 		renderer.domElement.addEventListener('pointermove', onPointerMove);
 		renderer.domElement.addEventListener('pointerleave', onPointerLeave);
 
-		// ---------------------------------------------------------------
 		// Resize
-		// ---------------------------------------------------------------
 		const resize = () => {
 			const w = container.clientWidth;
 			const h = container.clientHeight;
@@ -316,39 +382,39 @@
 			camera.updateProjectionMatrix();
 			renderer.setSize(w, h, false);
 			starMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+			glowMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
 		};
 		const ro = new ResizeObserver(resize);
 		ro.observe(container);
 
 		// ---------------------------------------------------------------
-		// Animation loop
+		// Animation loop + nearest-label updates
 		// ---------------------------------------------------------------
 		const start = performance.now();
 		let raf = 0;
 		let lastPickTime = 0;
+		let lastLabelTime = 0;
+		const LABEL_K = 5; // how many labels to show
+		const LABEL_MAX_DIST = 11; // world units — only really close stars
+		const LABEL_MAX_DIST_SQ = LABEL_MAX_DIST * LABEL_MAX_DIST;
+		const projV = new THREE.Vector3();
 
-		const tmpVec = new THREE.Vector3();
 		const lookTarget = new THREE.Vector3();
 
 		const animate = () => {
 			const t = (performance.now() - start) / 1000;
 			starMaterial.uniforms.uTime.value = t;
 			glowMaterial.uniforms.uTime.value = t;
+			lineMaterial.uniforms.uTime.value = t;
 
-			// Cinematic Lissajous-ish drift through the cloud — the camera lives
-			// near the cloud's center but slowly weaves around so the parallax
-			// reveals new stars as you watch.
 			const driftR = 8;
 			camera.position.x = driftR * Math.cos(t * 0.06);
 			camera.position.y = driftR * 0.35 * Math.sin(t * 0.09);
 			camera.position.z = driftR * Math.sin(t * 0.07);
 
-			// Smoothed parallax + drag-look toward (yaw, pitch).
 			parallaxX += (targetParallaxX - parallaxX) * 0.05;
 			parallaxY += (targetParallaxY - parallaxY) * 0.05;
 
-			// Look slightly ahead of the path so we feel motion, biased by
-			// user drag and pointer parallax.
 			lookTarget.set(
 				camera.position.x * 0.3 + (yaw + parallaxX) * 14,
 				camera.position.y * 0.3 + (pitch + parallaxY) * 10,
@@ -356,12 +422,11 @@
 			);
 			camera.lookAt(lookTarget);
 
-			// Spin the cloud itself, very slowly — adds passive motion when the
-			// user is hovering and the camera path is paused-ish.
 			stars.rotation.y = t * 0.012;
 			glow.rotation.y = t * 0.012;
+			links.rotation.y = t * 0.012;
 
-			// Picking: throttle to ~30 Hz so this doesn't blow CPU on big clouds.
+			// Pick (~30 Hz)
 			if (performance.now() - lastPickTime > 33 && pointer.x > -1.5) {
 				lastPickTime = performance.now();
 				raycaster.setFromCamera(pointer, camera);
@@ -378,6 +443,67 @@
 				}
 			}
 
+			// Nearest-label update (~8 Hz; cheap O(n) sweep)
+			if (performance.now() - lastLabelTime > 125) {
+				lastLabelTime = performance.now();
+				const camX = camera.position.x,
+					camY = camera.position.y,
+					camZ = camera.position.z;
+				// Account for stars.rotation.y when computing world-space dist
+				const cos = Math.cos(stars.rotation.y);
+				const sin = Math.sin(stars.rotation.y);
+
+				const found: Array<[number, number]> = []; // [idx, dist2]
+				for (let i = 0; i < n; i++) {
+					// Rotate the local star pos into world space
+					const lx = positions[3 * i],
+						ly = positions[3 * i + 1],
+						lz = positions[3 * i + 2];
+					const wx = lx * cos + lz * sin;
+					const wz = -lx * sin + lz * cos;
+					const dx = camX - wx,
+						dy = camY - ly,
+						dz = camZ - wz;
+					const d2 = dx * dx + dy * dy + dz * dz;
+					if (d2 < LABEL_MAX_DIST_SQ) found.push([i, d2]);
+				}
+				found.sort((a, b) => a[1] - b[1]);
+				const top = found.slice(0, LABEL_K * 2);
+
+				// Project each to NDC, filter to those actually in front of camera
+				// + within the viewport
+				const newLabels: Array<{
+					title: string;
+					x: number;
+					y: number;
+					opacity: number;
+					id: string;
+				}> = [];
+				for (const [i, d2] of top) {
+					const lx = positions[3 * i],
+						ly = positions[3 * i + 1],
+						lz = positions[3 * i + 2];
+					const wx = lx * cos + lz * sin;
+					const wz = -lx * sin + lz * cos;
+					projV.set(wx, ly, wz).project(camera);
+					if (projV.z <= 0 || projV.z >= 1) continue;
+					const sx = (projV.x + 1) * 0.5;
+					const sy = (1 - projV.y) * 0.5;
+					if (sx < 0.04 || sx > 0.96 || sy < 0.04 || sy > 0.96) continue;
+					const d = Math.sqrt(d2);
+					const op = Math.max(0, 1 - d / LABEL_MAX_DIST);
+					newLabels.push({
+						title: data.titles[i],
+						x: sx,
+						y: sy,
+						opacity: op,
+						id: String(i)
+					});
+					if (newLabels.length >= LABEL_K) break;
+				}
+				labels = newLabels;
+			}
+
 			renderer.render(scene, camera);
 			raf = requestAnimationFrame(animate);
 		};
@@ -392,8 +518,10 @@
 			renderer.domElement.removeEventListener('pointermove', onPointerMove);
 			renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
 			geometry.dispose();
+			lineGeo.dispose();
 			starMaterial.dispose();
 			glowMaterial.dispose();
+			lineMaterial.dispose();
 			renderer.dispose();
 			renderer.domElement.remove();
 		};
@@ -417,7 +545,7 @@
 					class="inline-block w-1.5 h-1.5 rounded-full"
 					style="background: var(--brand); box-shadow: 0 0 12px var(--brand); animation: pulse-slow 1.5s ease-in-out infinite;"
 				></span>
-				warming up the cloud…
+				weaving the cloud…
 			</div>
 		</div>
 	{/if}
@@ -429,7 +557,23 @@
 	{/if}
 
 	{#if !loading && !error}
-		<!-- Hover readout / hint -->
+		<!-- Sparse, aesthetic floating titles near the camera -->
+		{#each labels as l (l.id)}
+			<div
+				class="absolute pointer-events-none nearby-label"
+				style="
+					left: {l.x * 100}%;
+					top: {l.y * 100}%;
+					transform: translate(12px, -50%);
+					opacity: {l.opacity.toFixed(3)};
+				"
+			>
+				<span class="leader"></span>
+				<span class="label-text">{l.title}</span>
+			</div>
+		{/each}
+
+		<!-- Hover readout -->
 		<div
 			class="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full text-xs mono pointer-events-none transition"
 			style="
@@ -442,12 +586,11 @@
 				max-width: 80vw;
 				overflow: hidden;
 				text-overflow: ellipsis;
+				z-index: 5;
 			"
 		>
 			{#if hoveredTitle}
-				<span style="color: {hoveredGenre ? 'var(--ink)' : 'inherit'};">
-					{hoveredTitle}
-				</span>
+				<span>{hoveredTitle}</span>
 				{#if hoveredGenre}
 					<span style="color: var(--ink-faint); margin-left: 0.4rem;">· {hoveredGenre}</span>
 				{/if}
@@ -456,10 +599,42 @@
 			{/if}
 		</div>
 
-		<!-- Bottom edge fade so the cloud melts into the page -->
 		<div
 			class="absolute inset-x-0 bottom-0 h-32 pointer-events-none"
 			style="background: linear-gradient(180deg, transparent, var(--bg) 90%);"
 		></div>
 	{/if}
 </div>
+
+<style>
+	.nearby-label {
+		font-family: 'Instrument Serif', Georgia, serif;
+		font-style: italic;
+		font-size: 0.78rem;
+		color: rgba(245, 247, 250, 0.85);
+		letter-spacing: 0.01em;
+		text-shadow: 0 0 8px rgba(10, 12, 16, 0.95), 0 0 14px rgba(10, 12, 16, 0.7);
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		white-space: nowrap;
+		will-change: opacity, left, top;
+	}
+
+	.leader {
+		display: inline-block;
+		width: 18px;
+		height: 1px;
+		background: linear-gradient(
+			90deg,
+			rgba(245, 247, 250, 0.55),
+			rgba(245, 247, 250, 0.08)
+		);
+	}
+
+	.label-text {
+		max-width: 26ch;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+</style>
