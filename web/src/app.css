@@ -1,13 +1,355 @@
 @import 'tailwindcss';
 
+/* ----------------------------------------------------------------------
+   Design tokens
+   ---------------------------------------------------------------------- */
+
 :root {
 	color-scheme: dark;
+
+	/* Surfaces */
+	--bg: #0a0c10;
+	--bg-tint: #11141a;
+	--surface: rgba(255, 255, 255, 0.04);
+	--surface-strong: rgba(255, 255, 255, 0.07);
+	--border: rgba(255, 255, 255, 0.08);
+	--border-strong: rgba(255, 255, 255, 0.18);
+
+	/* Text */
+	--ink: #f5f7fa;
+	--ink-muted: rgba(245, 247, 250, 0.65);
+	--ink-dim: rgba(245, 247, 250, 0.4);
+	--ink-faint: rgba(245, 247, 250, 0.25);
+
+	/* Brand */
+	--brand: #34d399; /* emerald — primary action */
+	--brand-dim: rgba(52, 211, 153, 0.18);
+	--accent: #fbbf24; /* gold — festival */
+	--accent-dim: rgba(251, 191, 36, 0.15);
+	--violet: #a78bfa; /* group flow */
+	--violet-dim: rgba(167, 139, 250, 0.18);
+	--rose: #f87171;
+	--rose-dim: rgba(248, 113, 113, 0.15);
+
+	/* Effects */
+	--glow-brand: 0 0 0 1px rgba(52, 211, 153, 0.45), 0 14px 50px -12px rgba(52, 211, 153, 0.4);
+	--glow-violet: 0 0 0 1px rgba(167, 139, 250, 0.45), 0 14px 50px -12px rgba(167, 139, 250, 0.4);
 }
+
+/* ----------------------------------------------------------------------
+   Base
+   ---------------------------------------------------------------------- */
 
 html,
 body {
-	background: #0b0d11;
-	color: #e6e8ec;
+	background: var(--bg);
+	color: var(--ink);
 	font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 	min-height: 100vh;
+	letter-spacing: -0.005em;
+	font-feature-settings: 'ss01', 'cv11';
+}
+
+body {
+	background-image:
+		radial-gradient(ellipse at top right, rgba(52, 211, 153, 0.06), transparent 50%),
+		radial-gradient(ellipse at top left, rgba(167, 139, 250, 0.04), transparent 50%),
+		radial-gradient(circle at 50% 110%, rgba(251, 191, 36, 0.03), transparent 60%);
+	background-attachment: fixed;
+}
+
+::selection {
+	background: var(--brand-dim);
+	color: var(--ink);
+}
+
+/* ----------------------------------------------------------------------
+   Typography utilities
+   ---------------------------------------------------------------------- */
+
+.display-xl {
+	font-size: clamp(2.25rem, 4vw + 0.5rem, 4rem);
+	line-height: 1;
+	letter-spacing: -0.03em;
+	font-weight: 600;
+}
+
+.display-md {
+	font-size: clamp(1.5rem, 2vw + 0.5rem, 2.25rem);
+	line-height: 1.1;
+	letter-spacing: -0.025em;
+	font-weight: 600;
+}
+
+.text-balance {
+	text-wrap: balance;
+}
+
+.mono {
+	font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Subtle gradient text for hero, status pills */
+.text-gradient {
+	background: linear-gradient(135deg, #6ee7b7 0%, #34d399 50%, #fbbf24 100%);
+	background-clip: text;
+	-webkit-background-clip: text;
+	color: transparent;
+}
+
+/* ----------------------------------------------------------------------
+   Surfaces / cards
+   ---------------------------------------------------------------------- */
+
+.surface {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 0.85rem;
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+}
+
+.surface-strong {
+	background: var(--surface-strong);
+	border: 1px solid var(--border-strong);
+	border-radius: 0.85rem;
+}
+
+.card-hover {
+	transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), border-color 220ms,
+		box-shadow 220ms, background-color 220ms;
+}
+
+.card-hover:hover {
+	transform: translateY(-2px);
+	border-color: var(--border-strong);
+	background: var(--surface-strong);
+	box-shadow: 0 14px 30px -16px rgba(0, 0, 0, 0.6);
+}
+
+/* ----------------------------------------------------------------------
+   Buttons
+   ---------------------------------------------------------------------- */
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	padding: 0.6rem 1rem;
+	border-radius: 0.55rem;
+	font-weight: 500;
+	font-size: 0.9rem;
+	letter-spacing: 0.002em;
+	transition: transform 120ms ease, background-color 160ms, color 160ms, box-shadow 200ms;
+	cursor: pointer;
+	border: 1px solid transparent;
+}
+
+.btn:active {
+	transform: translateY(1px);
+}
+
+.btn:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.btn-primary {
+	background: linear-gradient(180deg, #4ade80 0%, #34d399 100%);
+	color: #062a1a;
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 6px 14px -4px rgba(52, 211, 153, 0.5);
+}
+.btn-primary:hover:not(:disabled) {
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 12px 30px -6px rgba(52, 211, 153, 0.55);
+}
+
+.btn-secondary {
+	background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+	color: #1c1d3a;
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 6px 14px -4px rgba(99, 102, 241, 0.5);
+}
+
+.btn-ghost {
+	background: transparent;
+	color: var(--ink-muted);
+	border-color: var(--border);
+}
+.btn-ghost:hover:not(:disabled) {
+	color: var(--ink);
+	border-color: var(--border-strong);
+	background: var(--surface);
+}
+
+.btn-pill {
+	border-radius: 999px;
+}
+
+/* ----------------------------------------------------------------------
+   Chips
+   ---------------------------------------------------------------------- */
+
+.chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	padding: 0.18rem 0.55rem;
+	border-radius: 999px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	font-size: 0.7rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--ink-muted);
+}
+
+.chip-brand {
+	background: var(--brand-dim);
+	border-color: rgba(52, 211, 153, 0.4);
+	color: #6ee7b7;
+}
+.chip-accent {
+	background: var(--accent-dim);
+	border-color: rgba(251, 191, 36, 0.4);
+	color: #fde68a;
+}
+.chip-violet {
+	background: var(--violet-dim);
+	border-color: rgba(167, 139, 250, 0.4);
+	color: #c4b5fd;
+}
+.chip-rose {
+	background: var(--rose-dim);
+	border-color: rgba(248, 113, 113, 0.4);
+	color: #fecaca;
+}
+
+/* ----------------------------------------------------------------------
+   Inputs
+   ---------------------------------------------------------------------- */
+
+.input {
+	width: 100%;
+	background: rgba(0, 0, 0, 0.32);
+	border: 1px solid var(--border);
+	color: var(--ink);
+	padding: 0.55rem 0.8rem;
+	border-radius: 0.55rem;
+	font-size: 0.9rem;
+	transition: border-color 160ms, background 160ms;
+}
+.input:focus {
+	outline: none;
+	border-color: var(--brand);
+	background: rgba(0, 0, 0, 0.5);
+}
+
+/* ----------------------------------------------------------------------
+   Animations
+   ---------------------------------------------------------------------- */
+
+@keyframes fadeUp {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes shimmer {
+	0% {
+		background-position: -200% 0;
+	}
+	100% {
+		background-position: 200% 0;
+	}
+}
+
+@keyframes pulse-slow {
+	0%, 100% {
+		opacity: 0.45;
+	}
+	50% {
+		opacity: 0.9;
+	}
+}
+
+@keyframes float {
+	0%, 100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-4px);
+	}
+}
+
+@keyframes spin-slow {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.anim-fade-up {
+	animation: fadeUp 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.shimmer-bg {
+	background: linear-gradient(
+		90deg,
+		rgba(255, 255, 255, 0.025) 25%,
+		rgba(255, 255, 255, 0.06) 50%,
+		rgba(255, 255, 255, 0.025) 75%
+	);
+	background-size: 200% 100%;
+	animation: shimmer 1.6s linear infinite;
+}
+
+/* ----------------------------------------------------------------------
+   Decorative
+   ---------------------------------------------------------------------- */
+
+/* Subtle film-grain overlay, applied to the page main container. Costless
+   and adds a cinematic texture. */
+.grain::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	background-image:
+		radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+	background-size: 3px 3px;
+	pointer-events: none;
+	mix-blend-mode: overlay;
+	opacity: 0.4;
+	z-index: 0;
+}
+
+/* Glow ring used behind hero text */
+.glow-ring {
+	position: absolute;
+	inset: -1rem;
+	background: radial-gradient(circle at 30% 30%, rgba(52, 211, 153, 0.18), transparent 60%);
+	filter: blur(40px);
+	z-index: -1;
+}
+
+/* Scrollbar */
+*::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+*::-webkit-scrollbar-track {
+	background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.06);
+	border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+	background: rgba(255, 255, 255, 0.14);
 }

@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { Upload, CheckCircle2 } from 'lucide-svelte';
+	import { fly } from 'svelte/transition';
+
 	let {
 		label,
 		accept = '.csv',
@@ -31,9 +34,12 @@
 </script>
 
 <label
-	class="block rounded-lg border-2 border-dashed cursor-pointer transition px-4 py-6 text-center
-		{dragging ? 'border-emerald-400 bg-emerald-500/5' : 'border-white/15 hover:border-white/30'}
-		{file ? 'bg-emerald-500/10 border-emerald-400/60' : ''}"
+	class="block rounded-lg border-2 border-dashed cursor-pointer transition px-4 py-5 text-center relative overflow-hidden"
+	style={file
+		? 'background: var(--brand-dim); border-color: rgba(52,211,153,0.55);'
+		: dragging
+			? 'background: rgba(52,211,153,0.06); border-color: var(--brand);'
+			: 'background: rgba(0,0,0,0.2); border-color: var(--border);'}
 	ondragover={(e) => {
 		e.preventDefault();
 		dragging = true;
@@ -41,11 +47,23 @@
 	ondragleave={() => (dragging = false)}
 	ondrop={onDrop}
 >
-	<div class="text-sm font-medium">{label}</div>
+	<div class="flex items-center justify-center gap-2 mb-1">
+		{#if file}
+			<CheckCircle2 size={16} style="color: var(--brand);" />
+		{:else}
+			<Upload size={16} style="color: var(--ink-dim);" />
+		{/if}
+		<div class="text-sm font-medium">{label}</div>
+	</div>
 	{#if file}
-		<div class="mt-1 text-xs text-emerald-300/90">{file.name} ({(file.size / 1024).toFixed(0)} KB)</div>
+		<div in:fly={{ y: -2, duration: 180 }} class="text-xs mono" style="color: #6ee7b7;">
+			{file.name}
+			<span style="color: var(--ink-dim);">· {(file.size / 1024).toFixed(0)} KB</span>
+		</div>
 	{:else}
-		<div class="mt-1 text-xs text-white/40">{hint || 'drop a CSV or click to choose'}</div>
+		<div class="text-xs" style="color: var(--ink-faint);">
+			{hint || 'drop a CSV or click to choose'}
+		</div>
 	{/if}
 	<input type="file" {accept} class="hidden" onchange={onChange} />
 </label>

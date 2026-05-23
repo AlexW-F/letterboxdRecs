@@ -1,7 +1,11 @@
 <script lang="ts">
+	import { fly } from 'svelte/transition';
+	import { Loader2, Wand2, Upload, RefreshCw, RotateCcw } from 'lucide-svelte';
 	import FileDropzone from '$lib/components/FileDropzone.svelte';
 	import ModeSelector from '$lib/components/ModeSelector.svelte';
 	import RecommendationCard from '$lib/components/RecommendationCard.svelte';
+	import Stat from '$lib/components/Stat.svelte';
+	import Shimmer from '$lib/components/Shimmer.svelte';
 	import {
 		getModes,
 		recommendIndividual,
@@ -12,7 +16,7 @@
 
 	let modes = $state<Mode[]>([]);
 	let mode = $state('balanced');
-	let topN = $state(10);
+	let topN = $state(12);
 	let excludeRated = $state(true);
 	let excludeWatched = $state(true);
 
@@ -88,23 +92,34 @@
 	}
 </script>
 
-<section class="space-y-6">
-	<header class="flex items-center justify-between">
+<section class="space-y-6 anim-fade-up">
+	<header class="flex items-end justify-between flex-wrap gap-3">
 		<div>
-			<h1 class="text-2xl font-semibold tracking-tight">Solo recommendations</h1>
-			<p class="text-sm text-white/50">
-				Upload your Letterboxd export, get top-N picks across four modes.
+			<span class="chip chip-brand">Solo · personalized re-rank</span>
+			<h1 class="display-md mt-2" style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic;">
+				Recommendations <span class="text-gradient">for one</span>.
+			</h1>
+			<p class="text-sm" style="color: var(--ink-muted);">
+				Upload your Letterboxd ratings, get top-N across four modes. Pick a tone, adjust the
+				exclusion toggles, recompute.
 			</p>
 		</div>
-		<a href="/" class="text-sm text-sky-300 hover:text-sky-200">← group flow</a>
+		<a
+			href="/"
+			class="btn btn-ghost btn-pill text-xs"
+		>← group flow</a>
 	</header>
 
 	{#if !hash}
-		<div class="rounded-lg bg-white/5 border border-white/10 p-4 space-y-3 max-w-lg">
+		<div class="surface p-5 space-y-4 max-w-xl anim-fade-up">
+			<div class="flex items-center gap-2">
+				<Upload size={16} style="color: var(--brand);" />
+				<h2 class="font-medium">Drop your Letterboxd CSVs</h2>
+			</div>
 			<FileDropzone
 				label="ratings.csv"
 				bind:file={ratingsFile}
-				hint="from your Letterboxd export — TMDB enrichment happens server-side (~15s first time)"
+				hint="from your Letterboxd export — TMDB enrichment server-side"
 			/>
 			<FileDropzone
 				label="watched.csv (optional)"
@@ -112,80 +127,116 @@
 				hint="excludes watched-but-unrated films from recs"
 			/>
 			{#if error}
-				<p class="text-sm text-red-400">{error}</p>
+				<p
+					class="text-sm rounded-md px-3 py-2"
+					style="background: var(--rose-dim); border: 1px solid rgba(248, 113, 113, 0.3); color: #fecaca;"
+				>
+					{error}
+				</p>
 			{/if}
 			<button
-				type="button"
+				class="btn btn-primary w-full"
 				onclick={uploadAndRecommend}
 				disabled={busy}
-				class="w-full px-4 py-2 rounded bg-emerald-500 text-emerald-950 font-medium hover:bg-emerald-400 disabled:bg-emerald-700/50"
 			>
-				{busy ? 'uploading + enriching + recommending…' : 'Upload + recommend'}
+				{#if busy}
+					<Loader2 size={16} class="animate-spin" />
+					Uploading + enriching + recommending…
+				{:else}
+					<Wand2 size={16} />
+					Upload + recommend
+				{/if}
 			</button>
 			{#if busy}
-				<p class="text-xs text-white/40">
-					First time around, the backend looks up each film on TMDB (~15s for a typical
-					Letterboxd export). Cached after that.
+				<p class="text-xs" style="color: var(--ink-dim);">
+					~15s for the first TMDB enrichment of ~250 ratings. Instant on re-upload.
 				</p>
 			{/if}
 		</div>
 	{:else}
-		<div class="rounded-lg bg-white/5 border border-white/10 p-4 space-y-4">
-			<div class="flex items-start justify-between">
-				<div>
-					<p class="text-sm text-white/70">
-						{#if uploadInfo}
-							{uploadInfo.mapped} of {uploadInfo.in} ratings mapped to ml-32m ({uploadInfo.with_tmdb}
-							had a TMDB ID).
-						{/if}
-					</p>
-					<p class="text-xs text-white/30">hash {hash.slice(0, 16)}…</p>
-				</div>
-				<button
-					type="button"
-					onclick={reset}
-					class="text-xs text-white/40 hover:text-white"
-				>
-					change upload
-				</button>
-			</div>
+		<div class="grid grid-cols-2 md:grid-cols-4 gap-3 anim-fade-up">
+			<Stat
+				label="ratings uploaded"
+				value={uploadInfo?.in ?? '—'}
+				hint={uploadInfo ? `${uploadInfo.with_tmdb} had TMDB IDs` : ''}
+			/>
+			<Stat
+				label="mapped to ml-32m"
+				value={uploadInfo?.mapped ?? '—'}
+				hint={uploadInfo ? `${Math.round(((uploadInfo.mapped ?? 0) / (uploadInfo.in || 1)) * 100)}% coverage` : ''}
+			/>
+			<Stat
+				label="mode"
+				value={mode}
+				hint={modes.find((m) => m.name === mode)?.description.slice(0, 36) ?? ''}
+			/>
+			<Stat label="top n" value={topN} hint="cards rendered below" />
+		</div>
 
+		<div class="surface p-5 space-y-4 anim-fade-up" style="animation-delay: 80ms;">
 			<ModeSelector {modes} bind:value={mode} />
 
-			<div class="flex flex-wrap items-center gap-4 text-sm">
+			<div class="flex flex-wrap items-center gap-4 text-sm pt-1">
 				<label class="flex items-center gap-2">
-					<span class="text-white/50 text-xs uppercase tracking-wider">top n</span>
+					<span class="text-[10px] uppercase tracking-[0.14em]" style="color: var(--ink-faint);">
+						top n
+					</span>
 					<input
 						type="number"
 						min="1"
 						max="50"
 						bind:value={topN}
-						class="w-16 bg-black/30 border border-white/10 rounded px-2 py-1 text-sm"
+						class="input"
+						style="width: 5rem; padding: 0.3rem 0.5rem;"
 					/>
 				</label>
-				<label class="flex items-center gap-2 text-white/70">
+				<label class="flex items-center gap-2 cursor-pointer">
 					<input type="checkbox" bind:checked={excludeRated} />
-					exclude rated
+					<span style="color: var(--ink-muted);">exclude rated</span>
 				</label>
-				<label class="flex items-center gap-2 text-white/70">
+				<label class="flex items-center gap-2 cursor-pointer">
 					<input type="checkbox" bind:checked={excludeWatched} />
-					exclude watched
+					<span style="color: var(--ink-muted);">exclude watched</span>
 				</label>
-				<button
-					type="button"
-					onclick={rerecommend}
-					disabled={busy}
-					class="ml-auto px-4 py-1.5 rounded bg-sky-500 text-sky-950 font-medium hover:bg-sky-400 disabled:opacity-50"
-				>
-					{busy ? 'recomputing…' : 'recompute'}
-				</button>
+
+				<div class="ml-auto flex gap-2">
+					<button class="btn btn-ghost btn-pill text-xs" onclick={reset}>
+						<RotateCcw size={12} />
+						change upload
+					</button>
+					<button class="btn btn-secondary" onclick={rerecommend} disabled={busy}>
+						{#if busy}
+							<Loader2 size={14} class="animate-spin" />
+							recomputing
+						{:else}
+							<RefreshCw size={14} />
+							recompute
+						{/if}
+					</button>
+				</div>
 			</div>
 		</div>
 
+		{#if busy && !result}
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-3 anim-fade-up">
+				{#each Array(6) as _, i (i)}
+					<div class="surface p-3 flex gap-3 h-32">
+						<Shimmer width="6rem" height="100%" rounded="0.5rem" />
+						<div class="flex-1 space-y-2 py-1">
+							<Shimmer height="1rem" width="70%" />
+							<Shimmer height="0.75rem" width="40%" />
+							<Shimmer height="2rem" width="100%" />
+						</div>
+					</div>
+				{/each}
+			</div>
+		{/if}
+
 		{#if result}
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-				{#each result.recommendations as r (r.movie_id)}
+				{#each result.recommendations as r, i (r.movie_id)}
 					<RecommendationCard
+						rank={i + 1}
 						title={r.title}
 						score={r.score}
 						explanation={r.explanation}

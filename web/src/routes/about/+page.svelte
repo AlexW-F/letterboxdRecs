@@ -1,92 +1,123 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { Database, Layers, Boxes, Shield, Cpu } from 'lucide-svelte';
+	import Stat from '$lib/components/Stat.svelte';
 	import { getHealth, type Health } from '$lib/api';
 
 	let health = $state<Health | null>(null);
 	let error = $state<string | null>(null);
 
-	$effect(() => {
+	onMount(() => {
 		getHealth()
 			.then((h) => (health = h))
 			.catch((e) => (error = e instanceof Error ? e.message : String(e)));
 	});
+
+	const stages = [
+		{
+			title: 'Candidate generation',
+			body: 'Union of top-K from two trained models on ml-32m (200,948 users × 84,432 items). Surprise SVD (64 factors, 20 epochs, scale 0.5–5.0) for explicit ratings; implicit ALS for positives (≥3.5) with Hu/Koren confidence weighting.'
+		},
+		{
+			title: 'Re-ranking',
+			body: 'Weighted blend of SVD score + ALS score − popularity penalty − MMR diversity penalty + genre-overlap bonus + content cosine. Per-mode weights at /modes.'
+		},
+		{
+			title: 'Content scoring',
+			body: 'Tag Genome 2021 (1,084 curated tags × 9,734 films, deep-learning-fitted relevance) as primary. TMDB plot embeddings via all-MiniLM-L6-v2 (384-d) at weight 0.3 for thematic adjacency. Director one-hots from IMDb opt-in via CONTENT_FEATURES_EXTRA.'
+		},
+		{
+			title: 'Group aggregation',
+			body: 'Six strategies, each operating on real per-member predictions (not zero-filled top-N): average, least_misery, most_pleasure, consensus, hybrid, group_taste_vector. The last one fuses all members into one super-user and re-ranks against the merged signal.'
+		}
+	];
 </script>
 
-<section class="space-y-6 max-w-3xl">
-	<h1 class="text-2xl font-semibold tracking-tight">About</h1>
+<section class="space-y-8 max-w-4xl anim-fade-up">
+	<header>
+		<span class="chip">about · methodology</span>
+		<h1 class="display-md mt-2" style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic;">
+			How the picks <span class="text-gradient">happen</span>.
+		</h1>
+		<p class="text-sm" style="color: var(--ink-muted);">
+			A four-stage hybrid recommender — collaborative filtering meets content semantics, with
+			group-aware aggregation as a first-class step.
+		</p>
+	</header>
 
-	<div class="rounded-lg bg-white/5 border border-white/10 p-4 space-y-2 text-sm">
-		<h2 class="text-base font-medium">Pipeline</h2>
-		<ol class="list-decimal list-inside space-y-1 text-white/70">
-			<li>
-				<strong>Candidate generation</strong> — union of top-K from two trained models on the
-				MovieLens 32M catalog (200,948 users × 84,432 items).
-				<ul class="list-disc list-inside ml-4 mt-1 text-white/50 text-xs">
-					<li>
-						Surprise <code>SVD</code> on explicit ratings — 64 latent factors, 20 epochs, rating
-						scale 0.5–5.0.
-					</li>
-					<li>
-						<code>implicit</code> <code>AlternatingLeastSquares</code> on positive ratings (≥ 3.5)
-						with Hu/Koren confidence weighting.
-					</li>
-				</ul>
-			</li>
-			<li>
-				<strong>Re-ranking</strong> — weighted blend of SVD, ALS, popularity penalty, MMR diversity
-				penalty, implicit genre-overlap bonus, and TF-IDF content cosine. Per-mode weights
-				expressed as <code>/modes</code>.
-			</li>
-			<li>
-				<strong>Content scoring</strong> — TF-IDF over MovieLens-32M's 2M user-generated tags +
-				genres (20k vocab). Each user's taste vector is a (rating − mean)-weighted average of
-				their rated movies' rows. Group taste vector fuses members.
-			</li>
-			<li>
-				<strong>Group aggregation</strong> — 6 strategies, including <code>group_taste_vector</code>
-				which fuses all members into one super-user and re-ranks against the fused signal.
-			</li>
-		</ol>
+	{#if health}
+		<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+			<Stat label="catalog" value={health.catalog_size.toLocaleString()} hint="ml-32m films" />
+			<Stat label="SVD" value={health.svd_loaded ? 'loaded' : '—'} hint="explicit ratings" />
+			<Stat label="ALS" value={health.als_loaded ? 'loaded' : '—'} hint="implicit feedback" />
+			<Stat label="content" value={health.content_loaded ? 'loaded' : '—'} hint="genome + overviews" />
+		</div>
+	{:else if error}
+		<p class="text-sm" style="color: #fca5a5;">{error}</p>
+	{/if}
+
+	<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+		{#each stages as s, i (s.title)}
+			<div
+				class="surface p-5 card-hover anim-fade-up"
+				style="animation-delay: {i * 40}ms;"
+			>
+				<div class="flex items-center gap-2 mb-2" style="color: var(--brand);">
+					{#if i === 0}<Database size={16} />{/if}
+					{#if i === 1}<Layers size={16} />{/if}
+					{#if i === 2}<Boxes size={16} />{/if}
+					{#if i === 3}<Cpu size={16} />{/if}
+					<h3 class="text-base font-medium" style="color: var(--ink);">{s.title}</h3>
+				</div>
+				<p class="text-sm" style="color: var(--ink-muted); line-height: 1.55;">{s.body}</p>
+			</div>
+		{/each}
 	</div>
 
-	<div class="rounded-lg bg-white/5 border border-white/10 p-4 space-y-2 text-sm">
-		<h2 class="text-base font-medium">Models loaded</h2>
-		{#if error}
-			<p class="text-red-400">{error}</p>
-		{:else if health}
-			<dl class="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
-				<dt class="text-white/40">status</dt>
-				<dd class="col-span-2 text-white">{health.status}</dd>
+	{#if health}
+		<div class="surface p-5">
+			<h2 class="text-base font-medium mb-3 flex items-center gap-2">
+				<Cpu size={16} style="color: var(--violet);" />
+				Live model state
+			</h2>
+			<dl class="grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
+				<dt style="color: var(--ink-faint);">status</dt>
+				<dd class="col-span-2">{health.status}</dd>
 
-				<dt class="text-white/40">catalog</dt>
-				<dd class="col-span-2 text-white">{health.catalog_size.toLocaleString()} films</dd>
+				<dt style="color: var(--ink-faint);">catalog</dt>
+				<dd class="col-span-2">{health.catalog_size.toLocaleString()} films</dd>
 
-				<dt class="text-white/40">SVD</dt>
-				<dd class="col-span-2 text-white">{health.svd_loaded ? 'loaded' : '—'}</dd>
+				<dt style="color: var(--ink-faint);">SVD</dt>
+				<dd class="col-span-2">{health.svd_loaded ? 'loaded' : '—'}</dd>
 
-				<dt class="text-white/40">ALS</dt>
-				<dd class="col-span-2 text-white">{health.als_loaded ? 'loaded' : '—'}</dd>
+				<dt style="color: var(--ink-faint);">ALS</dt>
+				<dd class="col-span-2">{health.als_loaded ? 'loaded' : '—'}</dd>
 
-				<dt class="text-white/40">content</dt>
-				<dd class="col-span-2 text-white">{health.content_loaded ? 'loaded' : '—'}</dd>
+				<dt style="color: var(--ink-faint);">content</dt>
+				<dd class="col-span-2">{health.content_loaded ? 'loaded' : '—'}</dd>
 
-				<dt class="text-white/40">model files</dt>
-				<dd class="col-span-2 text-white">{health.model_name}</dd>
+				<dt style="color: var(--ink-faint);">3D viz</dt>
+				<dd class="col-span-2">{health.movie_space_loaded ? 'loaded' : 'static fallback'}</dd>
 
-				<dt class="text-white/40">cache</dt>
-				<dd class="col-span-2 text-white/60 text-[11px]">{health.cache_dir}</dd>
+				<dt style="color: var(--ink-faint);">model files</dt>
+				<dd class="col-span-2 mono text-xs" style="color: var(--ink-muted);">{health.model_name}</dd>
+
+				<dt style="color: var(--ink-faint);">cache</dt>
+				<dd class="col-span-2 mono text-xs" style="color: var(--ink-dim);">{health.cache_dir}</dd>
 			</dl>
-		{:else}
-			<p class="text-white/40">connecting…</p>
-		{/if}
-	</div>
+		</div>
+	{/if}
 
-	<div class="rounded-lg bg-white/5 border border-white/10 p-4 space-y-2 text-sm">
-		<h2 class="text-base font-medium">Privacy</h2>
-		<p class="text-white/60">
+	<div class="surface p-5">
+		<div class="flex items-center gap-2 mb-3">
+			<Shield size={16} style="color: var(--brand);" />
+			<h2 class="text-base font-medium">Privacy</h2>
+		</div>
+		<p class="text-sm" style="color: var(--ink-muted);">
 			Uploaded ratings are content-hashed (SHA-256 of sorted CSV lines) and cached server-side
-			against that hash. There's no session lifecycle and no PII at rest beyond the rating/movieId
-			pairs. Re-uploading the same export is a cache hit. Clearing the cache directory
-			(<code>.api_cache/</code>) wipes everything.
+			against that hash. No session lifecycle, no PII at rest beyond the rating/movieId pairs.
+			Re-uploading the same export is a cache hit. Clearing the
+			<code class="mono">.api_cache/</code> directory wipes everything.
 		</p>
 	</div>
 </section>

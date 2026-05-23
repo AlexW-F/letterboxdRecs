@@ -8,16 +8,18 @@
 </script>
 
 <div class="space-y-2">
-	<div class="text-xs uppercase tracking-wider text-white/40">Group strategy</div>
-	<div class="flex flex-wrap gap-2">
+	<div class="text-[10px] uppercase tracking-[0.14em]" style="color: var(--ink-faint);">
+		Group strategy
+	</div>
+	<div class="flex flex-wrap gap-1.5">
 		{#each strategies as s (s.name)}
 			<button
 				type="button"
 				onclick={() => (value = s.name)}
-				class="px-3 py-1.5 rounded text-sm border transition
-					{value === s.name
-					? 'bg-sky-500/20 border-sky-400/70 text-sky-100'
-					: 'border-white/15 text-white/70 hover:border-white/30'}"
+				class="px-3 py-1.5 rounded-md text-sm transition"
+				style={value === s.name
+					? 'background: var(--violet-dim); border: 1px solid rgba(167,139,250,0.55); color: #ddd6fe;'
+					: 'background: var(--surface); border: 1px solid var(--border); color: var(--ink-muted);'}
 				title={s.description}
 			>
 				{s.name}
@@ -25,7 +27,7 @@
 		{/each}
 	</div>
 	{#if strategies.length}
-		<p class="text-xs text-white/40">
+		<p class="text-xs text-balance" style="color: var(--ink-dim);">
 			{strategies.find((s) => s.name === value)?.description ?? ''}
 		</p>
 	{/if}
