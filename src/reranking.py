@@ -638,6 +638,44 @@ class Reranker:
         if self.content_scorers and weights.content > 0:
             content_norm = self._content_norms(user_ratings, candidates)
 
+        # Per-candidate "why this?" contributors — for each candidate, the
+        # rated films most similar to it in the primary content scorer's
+        # space. Vectorized over the user's high-rated films × all
+        # candidates (one sparse-matrix dot product). Falls back to the
+        # user's global top-rated list when a candidate isn't in the
+        # content catalog (or no content scorer is configured).
+        per_cand_contributors: Dict[str, List[Tuple[str, float]]] = {}
+        if self.content_scorers and top_rated_movies:
+            primary = self.content_scorers[0]
+            rated_idxs: List[int] = []
+            rated_meta: List[Tuple[str, float]] = []
+            for mid, rating in top_rated_movies:
+                idx = primary.index_of.get(str(mid))
+                if idx is not None:
+                    rated_idxs.append(idx)
+                    rated_meta.append((str(mid), rating))
+            cand_id_list = [c for c in candidates if c in primary.index_of]
+            cand_idxs = [primary.index_of[c] for c in cand_id_list]
+            if rated_idxs and cand_idxs:
+                import numpy as _np
+                R_mat = primary.tfidf[rated_idxs]
+                C_mat = primary.tfidf[cand_idxs]
+                # (C, R) similarity since rows are L2-normalized.
+                sim = (C_mat @ R_mat.T).toarray()
+                for ci, cand_id in enumerate(cand_id_list):
+                    row = sim[ci]
+                    # Top-3 most-similar rated films with non-trivial sim.
+                    order = _np.argsort(row)[::-1][:6]
+                    picks: List[Tuple[str, float]] = []
+                    for ri in order:
+                        if float(row[ri]) <= 0.05:
+                            continue
+                        picks.append(rated_meta[ri])
+                        if len(picks) == 3:
+                            break
+                    if picks:
+                        per_cand_contributors[cand_id] = picks
+
         # Score each candidate (without diversity yet — diversity is applied iteratively)
         base_scores: Dict[str, Dict[str, float]] = {}
         for mid in candidates:
@@ -690,7 +728,9 @@ class Reranker:
             if best_mid is None:
                 break
 
-            # Build explanation
+            # Build explanation. "Why this?" prefers per-candidate similarity
+            # in the content space; falls back to the user's global top-rated
+            # only when the candidate isn't in the content catalog.
             cand_genres = self.genre_features.get(best_mid, set())
             shared_genres = sorted(set(liked_genres) & cand_genres,
                                    key=lambda g: -liked_genres.get(g, 0.0))
@@ -699,9 +739,10 @@ class Reranker:
                 sources.append("svd")
             if best_mid in als_scores:
                 sources.append("als")
+            contrib = per_cand_contributors.get(best_mid) or top_rated_movies[:3]
             explanation = Explanation(
                 top_contributing_rated_movies=[
-                    (self.titles.get(m, m), r) for m, r in top_rated_movies[:3]
+                    (self.titles.get(m, m), r) for m, r in contrib
                 ],
                 dominant_genre_overlap=", ".join(shared_genres[:3]),
                 popularity_tier=self.popularity.tier(best_mid),

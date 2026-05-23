@@ -101,40 +101,54 @@
 	<!-- Hero — text floats over the galaxy. pointer-events: none lets the
 	     user drag/spin the canvas behind it without dead zones. -->
 	<div
-		class="anim-fade-up text-center min-h-[78vh] flex flex-col items-center justify-center space-y-5 pb-12"
+		class="anim-fade-up min-h-[78vh] flex flex-col items-center justify-center pb-12"
 		style="pointer-events: none;"
 	>
-		<span class="chip chip-accent" style="pointer-events: auto;">
-			<Sparkles size={11} />
-			5,000 films · drifting through ALS latent space
-		</span>
-		<h1
-			class="display-xl text-balance mx-auto"
-			style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic; max-width: 24ch; text-shadow: 0 0 40px rgba(10, 12, 16, 0.85);"
+		<!-- Frosted glass card behind the hero text. Keeps the headline +
+		     paragraph readable no matter what cluster passes behind. -->
+		<div
+			class="hero-card relative px-6 sm:px-10 py-7 sm:py-9 text-center space-y-5 max-w-3xl"
+			style="
+				background: radial-gradient(ellipse at center, rgba(10, 12, 16, 0.78) 30%, rgba(10, 12, 16, 0.55) 75%, rgba(10, 12, 16, 0) 100%);
+				border-radius: 1.5rem;
+				backdrop-filter: blur(10px) saturate(140%);
+				-webkit-backdrop-filter: blur(10px) saturate(140%);
+				box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.55);
+			"
 		>
-			Movie recommendations <br />
-			<span class="text-gradient">your whole group</span> will love.
-		</h1>
-		<p
-			class="text-balance max-w-2xl mx-auto"
-			style="color: var(--ink-muted); font-size: 1.05rem; line-height: 1.55; text-shadow: 0 0 20px rgba(10, 12, 16, 0.75);"
-		>
-			Each friend uploads their Letterboxd export. The backend folds everyone into the latent
-			space you're hovering through, blends in Tag Genome relevance + TMDB plot embeddings, then
-			re-ranks for diversity, popularity-debiased semantic alignment, and group fairness.
-		</p>
-		<div class="flex flex-wrap items-center gap-3 justify-center" style="pointer-events: auto;">
-			<button class="btn btn-primary" onclick={scrollToForm}>
-				<UserPlus size={15} />
-				Add a friend
-			</button>
-			<button class="btn btn-ghost" onclick={() => goto('/me')}>
-				Just me →
-			</button>
+			<span class="chip chip-accent" style="pointer-events: auto;">
+				<Sparkles size={11} />
+				5,000 films · drifting through ALS latent space
+			</span>
+			<h1
+				class="display-xl text-balance mx-auto"
+				style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic; max-width: 24ch;"
+			>
+				Movie recommendations <br />
+				<span class="text-gradient">your whole group</span> will love.
+			</h1>
+			<p
+				class="text-balance max-w-2xl mx-auto"
+				style="color: var(--ink); font-size: 1.05rem; line-height: 1.55;"
+			>
+				Each friend uploads their Letterboxd export. The backend folds everyone into the latent
+				space you're hovering through, blends in Tag Genome relevance + TMDB plot embeddings,
+				then re-ranks for diversity, popularity-debiased semantic alignment, and group
+				fairness.
+			</p>
+			<div class="flex flex-wrap items-center gap-3 justify-center" style="pointer-events: auto;">
+				<button class="btn btn-primary" onclick={scrollToForm}>
+					<UserPlus size={15} />
+					Add a friend
+				</button>
+				<button class="btn btn-ghost" onclick={() => goto('/me')}>
+					Just me →
+				</button>
+			</div>
 		</div>
 		<button
 			type="button"
-			class="text-xs flex items-center gap-1 opacity-70 hover:opacity-100 transition mt-6"
+			class="text-xs flex items-center gap-1 opacity-70 hover:opacity-100 transition mt-8"
 			style="color: var(--ink-dim); pointer-events: auto;"
 			onclick={scrollToForm}
 			aria-label="scroll to upload form"
