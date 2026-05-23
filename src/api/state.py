@@ -21,6 +21,7 @@ from ..content_features import ContentFeatures
 from ..evaluation import build_genre_features
 from ..group_reranker import GROUP_STRATEGIES, GroupReranker
 from ..reranking import ALSScorer, MODE_WEIGHTS, PopularityModel, Reranker, SVDScorer
+from ..viz import MovieSpaceIndex
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,8 @@ class ModelState:
 
     svd_path: Path
     als_path: Path
+    als_scorer: ALSScorer
+    movie_space_index: Optional[MovieSpaceIndex] = None
     tmdb_api_key: Optional[str] = None
     reranker_modes_set: frozenset = frozenset(MODE_WEIGHTS.keys())
     group_strategies_set: frozenset = frozenset(GROUP_STRATEGIES)
@@ -133,6 +136,17 @@ def load_state() -> ModelState:
 
     cache = Cache(str(cache_dir))
 
+    # Pre-computed UMAP background for /explore personalization. Optional —
+    # if missing, /explore just falls back to the static snapshot.
+    msi_path = Path(os.getenv("MOVIE_SPACE_INDEX", PROJECT_ROOT / "data" / "movie_space_index.pkl"))
+    movie_space_index: Optional[MovieSpaceIndex] = None
+    if msi_path.exists():
+        movie_space_index = MovieSpaceIndex.load(msi_path)
+        logger.info("loaded movie-space index from %s: %d background films",
+                    msi_path, movie_space_index.background_coords.shape[0])
+    else:
+        logger.warning("no movie-space index at %s — /explore is static", msi_path)
+
     # TMDB key for server-side enrichment of raw Letterboxd uploads.
     tmdb_key = os.getenv("TMDB_API_KEY")
     if not tmdb_key:
@@ -161,5 +175,7 @@ def load_state() -> ModelState:
         cache=cache,
         svd_path=svd_path,
         als_path=als_path,
+        als_scorer=als,
+        movie_space_index=movie_space_index,
         tmdb_api_key=tmdb_key,
     )

@@ -29,7 +29,7 @@ import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import meta, recommendations as rec_router
+from .routers import explore as explore_router, meta, recommendations as rec_router
 from .schemas import HealthResponse, UploadOut
 from .state import load_state
 
@@ -54,6 +54,7 @@ app.add_middleware(
 
 app.include_router(meta.router)
 app.include_router(rec_router.router)
+app.include_router(explore_router.router)
 
 
 @app.on_event("startup")
@@ -82,6 +83,7 @@ def health(request: Request) -> HealthResponse:
         catalog_size=len(state.movies_df),
         model_name=state.svd_path.name + " + " + state.als_path.name,
         cache_dir=str(state.cache.directory),
+        movie_space_loaded=state.movie_space_index is not None,
     )
 
 

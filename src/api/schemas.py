@@ -161,3 +161,4 @@ class HealthResponse(BaseModel):
     catalog_size: int
     model_name: str
     cache_dir: str
+    movie_space_loaded: bool = False

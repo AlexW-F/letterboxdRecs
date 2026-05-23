@@ -78,6 +78,15 @@ export interface Health {
 	catalog_size: number;
 	model_name: string;
 	cache_dir: string;
+	movie_space_loaded: boolean;
+}
+
+export async function fetchPersonalizedVizHTML(hash: string, label?: string): Promise<string> {
+	const params = new URLSearchParams({ hash });
+	if (label) params.set('label', label);
+	const r = await fetch(`${API_BASE}/explore/personalized?${params}`);
+	if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`);
+	return r.text();
 }
 
 async function jsonGet<T>(path: string): Promise<T> {
