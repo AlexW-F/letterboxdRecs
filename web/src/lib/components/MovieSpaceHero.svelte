@@ -21,21 +21,20 @@
 	let hoveredGenre = $state<string | null>(null);
 
 	// Sparse labels for the few films closest to the moving camera.
-	// Smoothly faded in / out so they don't pop as the camera drifts.
-	let labels = $state<
-		Array<{ title: string; x: number; y: number; opacity: number; id: string }>
-	>([]);
+	// Svelte reactivity only fires when the label MEMBERSHIP changes
+	// (a film enters/leaves the candidate set). Position + opacity are
+	// updated imperatively on the DOM every frame via labelEls so they
+	// track the camera smoothly without per-frame Svelte diffing.
+	let labels = $state<Array<{ title: string; id: string; starIdx: number }>>([]);
 	type LabelState = {
 		id: string;
 		title: string;
-		x: number;
-		y: number;
+		starIdx: number;
 		opacity: number;       // smoothed current
 		targetOpacity: number; // what we're approaching
-		targetX: number;
-		targetY: number;
 	};
 	const labelMap = new Map<string, LabelState>();
+	const labelEls: Record<string, HTMLDivElement> = $state({});
 
 	let cleanup: (() => void) | null = null;
 
@@ -475,9 +474,9 @@
 				}
 			}
 
-			// Recompute candidates at ~6 Hz (the screen-space dedup + visibility
-			// filter is O(n) per tick; cheap).
-			if (performance.now() - lastLabelTime > 160) {
+			// Recompute *candidates* (which stars get a label) at ~10 Hz.
+			// Positions update every frame below — this only changes the set.
+			if (performance.now() - lastLabelTime > 100) {
 				lastLabelTime = performance.now();
 				const camX = camera.position.x,
 					camY = camera.position.y,
@@ -500,14 +499,7 @@
 				}
 				found.sort((a, b) => a[1] - b[1]);
 
-				// Project candidates, dedup by screen distance, pick K.
-				type Candidate = {
-					id: string;
-					title: string;
-					x: number;
-					y: number;
-					op: number;
-				};
+				type Candidate = { id: string; title: string; sx: number; sy: number; op: number; idx: number };
 				const accepted: Candidate[] = [];
 				for (const [i, d2] of found) {
 					if (accepted.length >= LABEL_K) break;
@@ -521,11 +513,10 @@
 					const sx = (projV.x + 1) * 0.5;
 					const sy = (1 - projV.y) * 0.5;
 					if (sx < 0.06 || sx > 0.94 || sy < 0.06 || sy > 0.94) continue;
-					// Dedup
 					let tooClose = false;
 					for (const a of accepted) {
-						const dxs = a.x - sx,
-							dys = a.y - sy;
+						const dxs = a.sx - sx,
+							dys = a.sy - sy;
 						if (dxs * dxs + dys * dys < LABEL_MIN_SCREEN_DIST * LABEL_MIN_SCREEN_DIST) {
 							tooClose = true;
 							break;
@@ -537,68 +528,85 @@
 					accepted.push({
 						id: String(i),
 						title: data.titles[i],
-						x: sx,
-						y: sy,
-						op
+						sx,
+						sy,
+						op,
+						idx: i
 					});
 				}
 
-				// Update the persistent label map so old labels keep fading out
-				// rather than popping. Mark accepted ids; everything else gets
-				// targetOpacity 0.
 				const acceptedIds = new Set(accepted.map((a) => a.id));
+				let membershipChanged = false;
 				for (const a of accepted) {
 					const existing = labelMap.get(a.id);
 					if (existing) {
-						existing.title = a.title;
-						existing.targetX = a.x;
-						existing.targetY = a.y;
 						existing.targetOpacity = a.op;
 					} else {
 						labelMap.set(a.id, {
 							id: a.id,
 							title: a.title,
-							x: a.x,
-							y: a.y,
+							starIdx: a.idx,
 							opacity: 0,
-							targetOpacity: a.op,
-							targetX: a.x,
-							targetY: a.y
+							targetOpacity: a.op
 						});
+						membershipChanged = true;
 					}
 				}
 				for (const [id, ls] of labelMap) {
 					if (!acceptedIds.has(id)) ls.targetOpacity = 0;
 				}
+
+				if (membershipChanged) {
+					labels = Array.from(labelMap.values()).map((ls) => ({
+						id: ls.id,
+						title: ls.title,
+						starIdx: ls.starIdx
+					}));
+				}
 			}
 
-			// Smooth fade + position per frame; cull fully-faded entries.
-			let dirty = false;
+			// Per-frame: project each labeled star to screen and mutate its
+			// DOM element imperatively. No Svelte re-render. Smooth, no lag.
+			const cosY = Math.cos(stars.rotation.y);
+			const sinY = Math.sin(stars.rotation.y);
+			const toRemove: string[] = [];
 			for (const [id, ls] of labelMap) {
-				const dx = ls.targetX - ls.x;
-				const dy = ls.targetY - ls.y;
 				const dop = ls.targetOpacity - ls.opacity;
-				if (Math.abs(dx) > 1e-4 || Math.abs(dy) > 1e-4) dirty = true;
-				ls.x += dx * 0.12;
-				ls.y += dy * 0.12;
 				if (Math.abs(dop) > 0.002) {
-					dirty = true;
-					ls.opacity += dop * 0.06;
+					ls.opacity += dop * 0.08;
 				} else {
 					ls.opacity = ls.targetOpacity;
 				}
 				if (ls.opacity < 0.01 && ls.targetOpacity === 0) {
-					labelMap.delete(id);
-					dirty = true;
+					toRemove.push(id);
+					continue;
 				}
+				const el = labelEls[id];
+				if (!el) continue;
+				const i = ls.starIdx;
+				const lx = positions[3 * i],
+					ly = positions[3 * i + 1],
+					lz = positions[3 * i + 2];
+				const wx = lx * cosY + lz * sinY;
+				const wz = -lx * sinY + lz * cosY;
+				projV.set(wx, ly, wz).project(camera);
+				if (projV.z <= 0 || projV.z >= 1) {
+					el.style.opacity = '0';
+					continue;
+				}
+				const sx = (projV.x + 1) * 0.5 * container.clientWidth;
+				const sy = (1 - projV.y) * 0.5 * container.clientHeight;
+				// GPU-accelerated transform — no layout thrash, no per-frame
+				// Svelte diff. Offset 18px right + center vertically.
+				el.style.transform = `translate3d(${sx + 18}px, ${sy}px, 0) translateY(-50%)`;
+				el.style.opacity = ls.opacity.toFixed(3);
 			}
-			if (dirty) {
+			if (toRemove.length) {
+				for (const id of toRemove) labelMap.delete(id);
 				labels = Array.from(labelMap.values()).map((ls) => ({
 					id: ls.id,
 					title: ls.title,
-					x: ls.x,
-					y: ls.y,
-					opacity: ls.opacity
+					starIdx: ls.starIdx
 				}));
 			}
 
@@ -658,15 +666,20 @@
 
 	{#if !loading && !error}
 		<!-- Sparse, aesthetic floating titles near the camera. Each is a
-		     tiny frosted-glass card with a leader line back to the star. -->
+		     tiny frosted-glass card with a leader line back to the star.
+		     Positions are mutated imperatively in the rAF loop via
+		     labelEls so they track the camera at 60fps with no lag. -->
 		{#each labels as l (l.id)}
 			<div
-				class="absolute pointer-events-none nearby-label"
+				bind:this={labelEls[l.id]}
+				class="nearby-label"
 				style="
-					left: {(l.x * 100).toFixed(2)}%;
-					top: {(l.y * 100).toFixed(2)}%;
-					transform: translate(18px, -50%);
-					opacity: {l.opacity.toFixed(3)};
+					position: absolute;
+					top: 0;
+					left: 0;
+					pointer-events: none;
+					opacity: 0;
+					will-change: transform, opacity;
 				"
 			>
 				<span class="leader-dot"></span>
