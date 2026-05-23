@@ -288,7 +288,15 @@ def main() -> int:
                 size=sizes,
                 color=rated_df["rating"], cmin=1.0, cmax=5.0,
                 colorscale=[[0.0, "#a83232"], [0.5, "#e8c547"], [1.0, "#3aa84a"]],
-                colorbar=dict(title=f"{args.user_label}'s rating", x=1.02, len=0.5),
+                # Horizontal colorbar across the bottom so it doesn't
+                # stack with the genre legend on the right.
+                colorbar=dict(
+                    title=dict(text=f"{args.user_label}'s rating", side="top"),
+                    orientation="h",
+                    x=0.5, xanchor="center",
+                    y=-0.05, yanchor="top",
+                    len=0.5, thickness=12,
+                ),
                 line=dict(color="#222", width=0.5), opacity=0.95,
             ),
             name=f"{args.user_label}: rated",
@@ -315,8 +323,20 @@ def main() -> int:
                    xaxis=dict(showticklabels=False),
                    yaxis=dict(showticklabels=False),
                    zaxis=dict(showticklabels=False)),
-        legend=dict(itemsizing="constant", y=0.95),
-        height=900,
+        # Genre legend stays on the right; the rating colorbar moved to
+        # the bottom (above) so they no longer overlap.
+        legend=dict(
+            itemsizing="constant",
+            x=1.02, xanchor="left",
+            y=1.0, yanchor="top",
+            bgcolor="rgba(11,13,17,0.5)",
+            font=dict(size=11),
+        ),
+        margin=dict(l=10, r=160, t=50, b=90),
+        paper_bgcolor="#0b0d11",
+        font=dict(color="#e6e8ec"),
+        autosize=True,
+        height=820,
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
