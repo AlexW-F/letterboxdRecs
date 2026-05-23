@@ -13,6 +13,7 @@
 	} from 'lucide-svelte';
 	import FileDropzone from '$lib/components/FileDropzone.svelte';
 	import Avatar from '$lib/components/Avatar.svelte';
+	import MovieSpaceHero from '$lib/components/MovieSpaceHero.svelte';
 	import { uploadLetterboxd } from '$lib/api';
 	import { loadMembers, saveMembers, clearMembers, type Member } from '$lib/store';
 
@@ -63,33 +64,38 @@
 </script>
 
 <section class="relative">
+	<!-- 3D hero — actual scatter of ml-32m's most popular films in their
+	     learned latent space. Auto-rotates, drag to spin, hover for titles. -->
+	<div class="relative -mx-4 sm:-mx-6 mb-2 anim-fade-up">
+		<MovieSpaceHero height="62vh" points={3000} />
+	</div>
+
 	<div class="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
 		<div
 			class="absolute -top-24 left-1/3 w-[60vw] h-[60vw] max-w-[700px] max-h-[700px] rounded-full"
-			style="background: radial-gradient(circle, rgba(52, 211, 153, 0.16), transparent 60%); filter: blur(40px);"
+			style="background: radial-gradient(circle, rgba(52, 211, 153, 0.12), transparent 60%); filter: blur(40px);"
 		></div>
 		<div
 			class="absolute top-32 right-0 w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] rounded-full"
-			style="background: radial-gradient(circle, rgba(167, 139, 250, 0.12), transparent 60%); filter: blur(50px);"
+			style="background: radial-gradient(circle, rgba(167, 139, 250, 0.10), transparent 60%); filter: blur(50px);"
 		></div>
 	</div>
 
-	<div class="anim-fade-up space-y-5 pb-10">
+	<div class="anim-fade-up space-y-4 pb-10" style="animation-delay: 80ms;">
 		<span class="chip chip-accent">
 			<Sparkles size={11} />
-			Group movie nights · SVD + ALS + Tag Genome
+			3,000 films above · the latent space your taste lives in
 		</span>
 		<h1 class="display-xl text-balance" style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic;">
 			Movie recommendations <br class="hidden md:block" />
 			<span class="text-gradient">your whole group</span> will love.
 		</h1>
 		<p class="text-balance max-w-2xl" style="color: var(--ink-muted); font-size: 1.05rem; line-height: 1.55;">
-			Each friend uploads their Letterboxd export. The backend folds everyone into a 64-dim
-			latent space, blends in Tag Genome 2021 relevance and TMDB plot embeddings, then re-ranks for
-			diversity and popularity-debiased semantic alignment. Six aggregation strategies including
-			our <span class="chip chip-violet ml-1">group_taste_vector</span>
-			which picks films
-			<em>nobody would have chosen alone</em> but everyone will love.
+			Each friend uploads their Letterboxd export. The backend folds everyone into the 64-dim
+			latent space you see above, blends in Tag Genome 2021 relevance and TMDB plot embeddings,
+			then re-ranks for diversity and popularity-debiased semantic alignment. Six aggregation
+			strategies including our <span class="chip chip-violet ml-1">group_taste_vector</span>
+			which picks films <em>nobody would have chosen alone</em> but everyone will love.
 		</p>
 	</div>
 

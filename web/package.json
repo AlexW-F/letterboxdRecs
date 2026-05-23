@@ -23,5 +23,8 @@
 		"tailwindcss": "^4.3.0",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.7"
+	},
+	"dependencies": {
+		"plotly.js-dist-min": "^3.5.1"
 	}
 }

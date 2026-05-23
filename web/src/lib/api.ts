@@ -81,6 +81,21 @@ export interface Health {
 	movie_space_loaded: boolean;
 }
 
+export interface BackgroundScatter {
+	n: number;
+	coords: [number, number, number][];
+	titles: string[];
+	genres: string[];
+	popularity: number[];
+	genre_colors: Record<string, string>;
+}
+
+export async function fetchBackgroundCoords(limit = 3000): Promise<BackgroundScatter> {
+	const r = await fetch(`${API_BASE}/explore/background?limit=${limit}`);
+	if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`);
+	return r.json() as Promise<BackgroundScatter>;
+}
+
 export async function fetchPersonalizedVizHTML(hash: string, label?: string): Promise<string> {
 	const params = new URLSearchParams({ hash });
 	if (label) params.set('label', label);

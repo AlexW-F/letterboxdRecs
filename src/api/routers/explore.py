@@ -15,10 +15,10 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from ..routers.recommendations import _load_member  # reuse hash -> ratings lookup
-from ...viz import render_personalized_html
+from ...viz import GENRE_COLOR, render_personalized_html
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["explore"])
@@ -29,6 +29,43 @@ def _state(request: Request):
     if state is None:
         raise HTTPException(status_code=503, detail="API still warming up")
     return state
+
+
+@router.get("/explore/background")
+def background_coords(
+    request: Request,
+    limit: int = Query(3000, ge=100, le=8000),
+) -> JSONResponse:
+    """Return the precomputed UMAP scatter as JSON so the frontend can
+    render it inline with plotly.js. Sorted by popularity descending so
+    the densest, most-recognizable films land first.
+
+    Used by the landing-page 3D hero.
+    """
+    state = _state(request)
+    if state.movie_space_index is None:
+        raise HTTPException(status_code=503, detail="movie-space index not built")
+    cache_key = f"bg_json::{limit}"
+    if cache_key in state.cache:
+        return JSONResponse(state.cache[cache_key])
+
+    msi = state.movie_space_index
+    df = msi.background_meta.copy()
+    df["x"] = msi.background_coords[:, 0]
+    df["y"] = msi.background_coords[:, 1]
+    df["z"] = msi.background_coords[:, 2]
+    df = df.sort_values("popularity", ascending=False).head(int(limit))
+
+    payload = {
+        "n": int(len(df)),
+        "coords": df[["x", "y", "z"]].astype(float).values.tolist(),
+        "titles": df["title"].astype(str).tolist(),
+        "genres": df["genre"].astype(str).tolist(),
+        "popularity": df["popularity"].astype(int).tolist(),
+        "genre_colors": GENRE_COLOR,
+    }
+    state.cache[cache_key] = payload
+    return JSONResponse(payload)
 
 
 @router.get("/explore/personalized", response_class=HTMLResponse)
