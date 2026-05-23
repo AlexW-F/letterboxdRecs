@@ -38,3 +38,6 @@ __pycache__/
 /web/node_modules
 /web/.svelte-kit
 /web/build
+/node_modules
+/package.json
+/package-lock.json

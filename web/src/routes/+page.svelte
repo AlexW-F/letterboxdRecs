@@ -64,10 +64,11 @@
 </script>
 
 <section class="relative">
-	<!-- 3D hero — actual scatter of ml-32m's most popular films in their
-	     learned latent space. Auto-rotates, drag to spin, hover for titles. -->
+	<!-- 3D hero — fly through the actual ALS latent space rendered with
+	     Three.js. Drift camera + mouse parallax + drag-to-look + hover
+	     picking via raycaster. Soft additive-blended stars with depth fog. -->
 	<div class="relative -mx-4 sm:-mx-6 mb-2 anim-fade-up">
-		<MovieSpaceHero height="62vh" points={3000} />
+		<MovieSpaceHero height="68vh" points={4500} />
 	</div>
 
 	<div class="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
@@ -84,7 +85,7 @@
 	<div class="anim-fade-up space-y-4 pb-10" style="animation-delay: 80ms;">
 		<span class="chip chip-accent">
 			<Sparkles size={11} />
-			3,000 films above · the latent space your taste lives in
+			4,500 films above · drift, drag, hover · the latent space your taste lives in
 		</span>
 		<h1 class="display-xl text-balance" style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic;">
 			Movie recommendations <br class="hidden md:block" />

@@ -3,50 +3,23 @@
 	import { fetchBackgroundCoords, type BackgroundScatter } from '$lib/api';
 
 	let {
-		height = '60vh',
-		autoRotate = true,
-		rotateSpeed = 0.0007,
-		points = 3000
+		height = '70vh',
+		points = 4500
 	}: {
 		height?: string;
-		autoRotate?: boolean;
-		rotateSpeed?: number;
 		points?: number;
 	} = $props();
 
 	let container: HTMLDivElement;
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let data = $state<BackgroundScatter | null>(null);
 	let hoveredTitle = $state<string | null>(null);
+	let hoveredGenre = $state<string | null>(null);
 
-	let plotlyRef: typeof import('plotly.js-dist-min') | null = null;
-	let rafId: number | null = null;
-	let theta = 0;
-	let plotInstance: HTMLElement | null = null;
-
-	function startRotate() {
-		if (!autoRotate || !plotInstance || !plotlyRef) return;
-		const radius = 1.85;
-		const tick = () => {
-			theta += rotateSpeed * 1000 / 60;
-			const eye = {
-				x: radius * Math.cos(theta),
-				y: radius * Math.sin(theta),
-				z: 0.8
-			};
-			plotlyRef!.relayout(plotInstance!, { 'scene.camera.eye': eye } as never);
-			rafId = requestAnimationFrame(tick);
-		};
-		rafId = requestAnimationFrame(tick);
-	}
-
-	function stopRotate() {
-		if (rafId !== null) cancelAnimationFrame(rafId);
-		rafId = null;
-	}
+	let cleanup: (() => void) | null = null;
 
 	onMount(async () => {
+		let data: BackgroundScatter;
 		try {
 			data = await fetchBackgroundCoords(points);
 		} catch (e) {
@@ -54,121 +27,317 @@
 			loading = false;
 			return;
 		}
-		// Lazy-load plotly only when this component mounts so initial route
-		// transitions stay fast for users who never see it.
-		const Plotly = await import('plotly.js-dist-min');
-		plotlyRef = Plotly;
 
-		const traces: Record<string, { x: number[]; y: number[]; z: number[]; titles: string[] }> = {};
-		for (let i = 0; i < data!.n; i++) {
-			const genre = data!.genres[i];
-			if (!traces[genre]) traces[genre] = { x: [], y: [], z: [], titles: [] };
-			traces[genre].x.push(data!.coords[i][0]);
-			traces[genre].y.push(data!.coords[i][1]);
-			traces[genre].z.push(data!.coords[i][2]);
-			traces[genre].titles.push(data!.titles[i]);
+		const THREE = await import('three');
+
+		// ---------------------------------------------------------------
+		// Scene + renderer
+		// ---------------------------------------------------------------
+		const renderer = new THREE.WebGLRenderer({
+			alpha: true,
+			antialias: true,
+			powerPreference: 'high-performance'
+		});
+		renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+		renderer.setSize(container.clientWidth, container.clientHeight, false);
+		// Background transparent so the page gradients show through.
+		renderer.setClearColor(0x000000, 0);
+		container.appendChild(renderer.domElement);
+		renderer.domElement.style.cssText =
+			'width: 100%; height: 100%; display: block; touch-action: none; cursor: grab;';
+
+		const scene = new THREE.Scene();
+		// Fog the same color as the page background so distant points dissolve
+		// into the void instead of popping at the far plane.
+		scene.fog = new THREE.Fog(0x0a0c10, 18, 80);
+
+		const camera = new THREE.PerspectiveCamera(
+			72,
+			container.clientWidth / container.clientHeight,
+			0.1,
+			200
+		);
+		camera.position.set(0, 0, 0);
+
+		// ---------------------------------------------------------------
+		// Center + scale the cloud so the camera path stays inside it.
+		// ---------------------------------------------------------------
+		const raw = data.coords;
+		let cx = 0, cy = 0, cz = 0;
+		for (const [x, y, z] of raw) {
+			cx += x;
+			cy += y;
+			cz += z;
+		}
+		cx /= raw.length;
+		cy /= raw.length;
+		cz /= raw.length;
+
+		let maxR = 0;
+		for (const [x, y, z] of raw) {
+			const dx = x - cx,
+				dy = y - cy,
+				dz = z - cz;
+			const r2 = dx * dx + dy * dy + dz * dz;
+			if (r2 > maxR) maxR = r2;
+		}
+		maxR = Math.sqrt(maxR);
+		const scale = 28 / maxR; // cloud radius ~28 units around origin
+
+		const positions = new Float32Array(raw.length * 3);
+		const colors = new Float32Array(raw.length * 3);
+		const sizes = new Float32Array(raw.length);
+
+		const c = new THREE.Color();
+		// Slight per-point size variation by popularity gives the cloud a
+		// near-field / far-field star feel; popular films are visibly larger.
+		const popMax = Math.max(...data.popularity);
+		for (let i = 0; i < raw.length; i++) {
+			positions[3 * i] = (raw[i][0] - cx) * scale;
+			positions[3 * i + 1] = (raw[i][1] - cy) * scale;
+			positions[3 * i + 2] = (raw[i][2] - cz) * scale;
+			const hex = data.genre_colors[data.genres[i]] ?? '#cccccc';
+			c.set(hex);
+			colors[3 * i] = c.r;
+			colors[3 * i + 1] = c.g;
+			colors[3 * i + 2] = c.b;
+			// Size scales loosely with log(popularity); range ~0.7–2.2.
+			const popN = Math.log1p(data.popularity[i]) / Math.log1p(popMax);
+			sizes[i] = 0.7 + popN * 1.5;
 		}
 
-		const plotData = Object.entries(traces).map(([genre, t]) => ({
-			type: 'scatter3d' as const,
-			mode: 'markers' as const,
-			x: t.x,
-			y: t.y,
-			z: t.z,
-			text: t.titles,
-			hovertemplate: '%{text}<extra></extra>',
-			name: genre,
-			marker: {
-				size: 3,
-				color: data!.genre_colors[genre] ?? '#cccccc',
-				opacity: 0.78,
-				line: { width: 0 }
-			}
-		}));
+		const geometry = new THREE.BufferGeometry();
+		geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+		geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+		geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
 
-		const layout = {
-			showlegend: false,
-			paper_bgcolor: 'rgba(0,0,0,0)',
-			plot_bgcolor: 'rgba(0,0,0,0)',
-			margin: { l: 0, r: 0, t: 0, b: 0 },
-			scene: {
-				bgcolor: 'rgba(0,0,0,0)',
-				xaxis: {
-					showbackground: false,
-					showgrid: false,
-					zeroline: false,
-					showticklabels: false,
-					title: { text: '' }
-				},
-				yaxis: {
-					showbackground: false,
-					showgrid: false,
-					zeroline: false,
-					showticklabels: false,
-					title: { text: '' }
-				},
-				zaxis: {
-					showbackground: false,
-					showgrid: false,
-					zeroline: false,
-					showticklabels: false,
-					title: { text: '' }
-				},
-				camera: { eye: { x: 1.85, y: 0, z: 0.8 } },
-				aspectmode: 'cube'
+		// ---------------------------------------------------------------
+		// Soft circular sprite via shader. Additive blending so overlaps
+		// glow brighter — like the milky way.
+		// ---------------------------------------------------------------
+		const starMaterial = new THREE.ShaderMaterial({
+			uniforms: {
+				uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+				uSize: { value: 38.0 },
+				uTime: { value: 0 }
 			},
-			hoverlabel: {
-				bgcolor: 'rgba(10,12,16,0.92)',
-				bordercolor: 'rgba(167,139,250,0.55)',
-				font: { color: '#f5f7fa', size: 12, family: 'Inter, sans-serif' }
+			vertexShader: `
+				attribute float aSize;
+				varying vec3 vColor;
+				varying float vDist;
+				uniform float uPixelRatio;
+				uniform float uSize;
+				void main() {
+					vColor = color;
+					vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+					vDist = -mvPosition.z;
+					gl_Position = projectionMatrix * mvPosition;
+					gl_PointSize = uSize * aSize * uPixelRatio / -mvPosition.z;
+				}
+			`,
+			fragmentShader: `
+				varying vec3 vColor;
+				varying float vDist;
+				void main() {
+					vec2 d = gl_PointCoord - vec2(0.5);
+					float r2 = dot(d, d);
+					if (r2 > 0.25) discard;
+					float alpha = smoothstep(0.25, 0.0, r2);
+					// Slight depth-based brightness — closer stars feel more alive.
+					float depthFade = 1.0 - smoothstep(20.0, 70.0, vDist);
+					gl_FragColor = vec4(vColor, alpha * (0.65 + 0.35 * depthFade));
+				}
+			`,
+			blending: THREE.AdditiveBlending,
+			depthWrite: false,
+			transparent: true,
+			vertexColors: true
+		});
+
+		const stars = new THREE.Points(geometry, starMaterial);
+		scene.add(stars);
+
+		// A second, smaller "core glow" pass — same points rendered tinier with
+		// stronger additive blending creates the soft halo around bright stars.
+		const haloMaterial = new THREE.PointsMaterial({
+			size: 0.85,
+			vertexColors: true,
+			transparent: true,
+			opacity: 0.55,
+			blending: THREE.AdditiveBlending,
+			depthWrite: false,
+			sizeAttenuation: true
+		});
+		const halo = new THREE.Points(geometry, haloMaterial);
+		scene.add(halo);
+
+		// ---------------------------------------------------------------
+		// Pick: raycaster for hover tooltips
+		// ---------------------------------------------------------------
+		const raycaster = new THREE.Raycaster();
+		// Threshold (in world units) makes screen-space hover forgiving.
+		raycaster.params.Points = { threshold: 0.65 };
+		const pointer = new THREE.Vector2(-2, -2); // off-screen by default
+
+		// ---------------------------------------------------------------
+		// Interaction state
+		// ---------------------------------------------------------------
+		let isDragging = false;
+		let dragX = 0;
+		let dragY = 0;
+		// User-applied look rotations on top of the auto camera path.
+		let yaw = 0;
+		let pitch = 0;
+		// Pointer-following parallax (subtle).
+		let parallaxX = 0;
+		let parallaxY = 0;
+		let targetParallaxX = 0;
+		let targetParallaxY = 0;
+
+		function onPointerDown(e: PointerEvent) {
+			isDragging = true;
+			dragX = e.clientX;
+			dragY = e.clientY;
+			renderer.domElement.style.cursor = 'grabbing';
+			(e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+		}
+		function onPointerUp(e: PointerEvent) {
+			isDragging = false;
+			renderer.domElement.style.cursor = 'grab';
+			(e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+		}
+		function onPointerMove(e: PointerEvent) {
+			const rect = renderer.domElement.getBoundingClientRect();
+			const nx = (e.clientX - rect.left) / rect.width;
+			const ny = (e.clientY - rect.top) / rect.height;
+			pointer.x = nx * 2 - 1;
+			pointer.y = -(ny * 2 - 1);
+
+			targetParallaxX = pointer.x * 0.25;
+			targetParallaxY = pointer.y * 0.18;
+
+			if (isDragging) {
+				const dx = e.clientX - dragX;
+				const dy = e.clientY - dragY;
+				yaw -= dx * 0.005;
+				pitch -= dy * 0.004;
+				// Clamp pitch so we don't flip.
+				pitch = Math.max(-0.85, Math.min(0.85, pitch));
+				dragX = e.clientX;
+				dragY = e.clientY;
 			}
-		};
+		}
+		function onPointerLeave() {
+			pointer.set(-2, -2);
+			targetParallaxX = 0;
+			targetParallaxY = 0;
+			hoveredTitle = null;
+			hoveredGenre = null;
+		}
 
-		const config = {
-			displayModeBar: false,
-			responsive: true,
-			scrollZoom: false,
-			displaylogo: false
-		};
+		renderer.domElement.addEventListener('pointerdown', onPointerDown);
+		window.addEventListener('pointerup', onPointerUp);
+		renderer.domElement.addEventListener('pointermove', onPointerMove);
+		renderer.domElement.addEventListener('pointerleave', onPointerLeave);
 
-		await Plotly.newPlot(container, plotData as never, layout as never, config);
-		plotInstance = container;
+		// ---------------------------------------------------------------
+		// Resize
+		// ---------------------------------------------------------------
+		const resize = () => {
+			const w = container.clientWidth;
+			const h = container.clientHeight;
+			camera.aspect = w / h;
+			camera.updateProjectionMatrix();
+			renderer.setSize(w, h, false);
+			starMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+		};
+		const ro = new ResizeObserver(resize);
+		ro.observe(container);
+
+		// ---------------------------------------------------------------
+		// Animation loop
+		// ---------------------------------------------------------------
+		const start = performance.now();
+		let raf = 0;
+		let lastPickTime = 0;
+
+		const tmpVec = new THREE.Vector3();
+		const lookTarget = new THREE.Vector3();
+
+		const animate = () => {
+			const t = (performance.now() - start) / 1000;
+			starMaterial.uniforms.uTime.value = t;
+
+			// Cinematic Lissajous-ish drift through the cloud — the camera lives
+			// near the cloud's center but slowly weaves around so the parallax
+			// reveals new stars as you watch.
+			const driftR = 8;
+			camera.position.x = driftR * Math.cos(t * 0.06);
+			camera.position.y = driftR * 0.35 * Math.sin(t * 0.09);
+			camera.position.z = driftR * Math.sin(t * 0.07);
+
+			// Smoothed parallax + drag-look toward (yaw, pitch).
+			parallaxX += (targetParallaxX - parallaxX) * 0.05;
+			parallaxY += (targetParallaxY - parallaxY) * 0.05;
+
+			// Look slightly ahead of the path so we feel motion, biased by
+			// user drag and pointer parallax.
+			lookTarget.set(
+				camera.position.x * 0.3 + (yaw + parallaxX) * 14,
+				camera.position.y * 0.3 + (pitch + parallaxY) * 10,
+				camera.position.z * 0.3 + 4 * Math.cos(t * 0.05)
+			);
+			camera.lookAt(lookTarget);
+
+			// Spin the cloud itself, very slowly — adds passive motion when the
+			// user is hovering and the camera path is paused-ish.
+			stars.rotation.y = t * 0.012;
+			halo.rotation.y = t * 0.012;
+
+			// Picking: throttle to ~30 Hz so this doesn't blow CPU on big clouds.
+			if (performance.now() - lastPickTime > 33 && pointer.x > -1.5) {
+				lastPickTime = performance.now();
+				raycaster.setFromCamera(pointer, camera);
+				const hits = raycaster.intersectObject(stars, false);
+				if (hits.length > 0) {
+					const idx = hits[0].index ?? -1;
+					if (idx >= 0 && idx < data.titles.length) {
+						hoveredTitle = data.titles[idx];
+						hoveredGenre = data.genres[idx];
+					}
+				} else {
+					hoveredTitle = null;
+					hoveredGenre = null;
+				}
+			}
+
+			renderer.render(scene, camera);
+			raf = requestAnimationFrame(animate);
+		};
+		animate();
 		loading = false;
 
-		(plotInstance as unknown as { on: (ev: string, h: (d: unknown) => void) => void }).on?.(
-			'plotly_hover',
-			(ev: unknown) => {
-				const e = ev as { points?: Array<{ text: string }> };
-				hoveredTitle = e.points?.[0]?.text ?? null;
-				stopRotate();
-			}
-		);
-		(plotInstance as unknown as { on: (ev: string, h: () => void) => void }).on?.(
-			'plotly_unhover',
-			() => {
-				hoveredTitle = null;
-				if (autoRotate) startRotate();
-			}
-		);
-		(plotInstance as unknown as { on: (ev: string, h: () => void) => void }).on?.(
-			'plotly_relayouting',
-			() => {
-				stopRotate();
-			}
-		);
-
-		if (autoRotate) startRotate();
+		cleanup = () => {
+			cancelAnimationFrame(raf);
+			ro.disconnect();
+			renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+			window.removeEventListener('pointerup', onPointerUp);
+			renderer.domElement.removeEventListener('pointermove', onPointerMove);
+			renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
+			geometry.dispose();
+			starMaterial.dispose();
+			haloMaterial.dispose();
+			renderer.dispose();
+			renderer.domElement.remove();
+		};
 	});
 
 	onDestroy(() => {
-		stopRotate();
-		if (plotInstance && plotlyRef) {
-			plotlyRef.purge(plotInstance);
-		}
+		if (cleanup) cleanup();
 	});
 </script>
 
-<div class="relative w-full" style="height: {height};">
+<div class="relative w-full" style="height: {height}; user-select: none;">
 	<div bind:this={container} class="absolute inset-0"></div>
 
 	{#if loading}
@@ -177,8 +346,11 @@
 			style="color: var(--ink-dim);"
 		>
 			<div class="text-sm flex items-center gap-2">
-				<span class="inline-block w-1.5 h-1.5 rounded-full" style="background: var(--brand); box-shadow: 0 0 12px var(--brand); animation: pulse-slow 1.5s ease-in-out infinite;"></span>
-				loading {points.toLocaleString()} films…
+				<span
+					class="inline-block w-1.5 h-1.5 rounded-full"
+					style="background: var(--brand); box-shadow: 0 0 12px var(--brand); animation: pulse-slow 1.5s ease-in-out infinite;"
+				></span>
+				warming up the cloud…
 			</div>
 		</div>
 	{/if}
@@ -190,18 +362,37 @@
 	{/if}
 
 	{#if !loading && !error}
-		<!-- Hover readout — minimal, floating, centered top -->
+		<!-- Hover readout / hint -->
 		<div
 			class="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full text-xs mono pointer-events-none transition"
-			style="background: rgba(10,12,16,0.78); border: 1px solid var(--border); color: {hoveredTitle ? 'var(--ink)' : 'var(--ink-faint)'}; backdrop-filter: blur(6px); opacity: {hoveredTitle ? 1 : 0.55};"
+			style="
+				background: rgba(10, 12, 16, 0.78);
+				border: 1px solid var(--border);
+				color: {hoveredTitle ? 'var(--ink)' : 'var(--ink-faint)'};
+				backdrop-filter: blur(6px);
+				opacity: {hoveredTitle ? 1 : 0.6};
+				white-space: nowrap;
+				max-width: 80vw;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			"
 		>
-			{hoveredTitle ?? '✦  hover any star  ✦  drag to spin'}
+			{#if hoveredTitle}
+				<span style="color: {hoveredGenre ? 'var(--ink)' : 'inherit'};">
+					{hoveredTitle}
+				</span>
+				{#if hoveredGenre}
+					<span style="color: var(--ink-faint); margin-left: 0.4rem;">· {hoveredGenre}</span>
+				{/if}
+			{:else}
+				✦  drift through the latent space  ✦  drag to look around
+			{/if}
 		</div>
 
-		<!-- Edge fades so the cloud blends into the page -->
+		<!-- Bottom edge fade so the cloud melts into the page -->
 		<div
-			class="absolute inset-0 pointer-events-none"
-			style="background: radial-gradient(ellipse at center, transparent 50%, var(--bg) 92%);"
+			class="absolute inset-x-0 bottom-0 h-32 pointer-events-none"
+			style="background: linear-gradient(180deg, transparent, var(--bg) 90%);"
 		></div>
 	{/if}
 </div>
