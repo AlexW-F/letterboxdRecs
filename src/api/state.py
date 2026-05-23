@@ -98,18 +98,32 @@ def load_state() -> ModelState:
                 extra.append(cf)
                 logger.info("loaded extra content features %s: %d movies, %d features",
                             p, cf.tfidf.shape[0], cf.n_features)
-    # Per-scorer weights via env: CONTENT_FEATURES_WEIGHTS="1.0,0.4" parallel
-    # to primary then each extra. Default to 1.0 across the board.
-    extra_weights: list[float] = []
+    # Auto-discover content_overviews if it's there. Sentence-transformer
+    # embeddings on TMDB plot text capture thematic taste (war docs, period
+    # drama, anime, etc.) — orthogonal to genome's "prestige/aesthetic" axis.
+    # Weight 0.3 nudges niche mode toward semantically-similar deep cuts
+    # without dominating the genome's clean popularity-debiased ranking.
+    auto_weights: list[float] = []
     weight_env = os.getenv("CONTENT_FEATURES_WEIGHTS", "").strip()
+    if not extra:
+        overviews_path = PROJECT_ROOT / "data" / "content_overviews"
+        if (content_path != overviews_path
+                and overviews_path.with_suffix(".npz").exists()):
+            cf = ContentFeatures.load(overviews_path)
+            extra.append(cf)
+            auto_weights.append(float(os.getenv("OVERVIEWS_WEIGHT", "0.3")))
+            logger.info("auto-loaded TMDB-overview embeddings (weight=%.2f): "
+                        "%d movies, %d-d", auto_weights[-1],
+                        cf.tfidf.shape[0], cf.n_features)
+
     if weight_env:
         parsed = [float(x.strip()) for x in weight_env.split(",") if x.strip()]
         # First weight is for the primary; remainder for extras.
         content_weights = parsed
     elif content is not None:
-        content_weights = [1.0] + [1.0] * len(extra)
+        content_weights = [1.0] + auto_weights + [1.0] * (len(extra) - len(auto_weights))
     else:
-        content_weights = [1.0] * len(extra)
+        content_weights = ([1.0] * len(extra)) if extra else []
 
     reranker = Reranker(svd, als, popularity, movies_df, genre_features,
                         content_features=content,
