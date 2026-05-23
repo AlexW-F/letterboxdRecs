@@ -17,9 +17,21 @@
 	let hoveredGenre = $state<string | null>(null);
 
 	// Sparse labels for the few films closest to the moving camera.
+	// Smoothly faded in / out so they don't pop as the camera drifts.
 	let labels = $state<
 		Array<{ title: string; x: number; y: number; opacity: number; id: string }>
 	>([]);
+	type LabelState = {
+		id: string;
+		title: string;
+		x: number;
+		y: number;
+		opacity: number;       // smoothed current
+		targetOpacity: number; // what we're approaching
+		targetX: number;
+		targetY: number;
+	};
+	const labelMap = new Map<string, LabelState>();
 
 	let cleanup: (() => void) | null = null;
 
@@ -394,11 +406,11 @@
 		let raf = 0;
 		let lastPickTime = 0;
 		let lastLabelTime = 0;
-		const LABEL_K = 5; // how many labels to show
-		const LABEL_MAX_DIST = 11; // world units — only really close stars
+		const LABEL_K = 3; // how many labels to surface at once
+		const LABEL_MAX_DIST = 12; // world units
 		const LABEL_MAX_DIST_SQ = LABEL_MAX_DIST * LABEL_MAX_DIST;
+		const LABEL_MIN_SCREEN_DIST = 0.18; // dedup if two labels would land within ~18% of viewport
 		const projV = new THREE.Vector3();
-
 		const lookTarget = new THREE.Vector3();
 
 		const animate = () => {
@@ -407,10 +419,11 @@
 			glowMaterial.uniforms.uTime.value = t;
 			lineMaterial.uniforms.uTime.value = t;
 
+			// Slowed by 2.5–3x from before so the labels have time to be read.
 			const driftR = 8;
-			camera.position.x = driftR * Math.cos(t * 0.06);
-			camera.position.y = driftR * 0.35 * Math.sin(t * 0.09);
-			camera.position.z = driftR * Math.sin(t * 0.07);
+			camera.position.x = driftR * Math.cos(t * 0.024);
+			camera.position.y = driftR * 0.35 * Math.sin(t * 0.036);
+			camera.position.z = driftR * Math.sin(t * 0.028);
 
 			parallaxX += (targetParallaxX - parallaxX) * 0.05;
 			parallaxY += (targetParallaxY - parallaxY) * 0.05;
@@ -418,13 +431,14 @@
 			lookTarget.set(
 				camera.position.x * 0.3 + (yaw + parallaxX) * 14,
 				camera.position.y * 0.3 + (pitch + parallaxY) * 10,
-				camera.position.z * 0.3 + 4 * Math.cos(t * 0.05)
+				camera.position.z * 0.3 + 4 * Math.cos(t * 0.02)
 			);
 			camera.lookAt(lookTarget);
 
-			stars.rotation.y = t * 0.012;
-			glow.rotation.y = t * 0.012;
-			links.rotation.y = t * 0.012;
+			// Cloud spin halved as well.
+			stars.rotation.y = t * 0.005;
+			glow.rotation.y = t * 0.005;
+			links.rotation.y = t * 0.005;
 
 			// Pick (~30 Hz)
 			if (performance.now() - lastPickTime > 33 && pointer.x > -1.5) {
@@ -443,19 +457,18 @@
 				}
 			}
 
-			// Nearest-label update (~8 Hz; cheap O(n) sweep)
-			if (performance.now() - lastLabelTime > 125) {
+			// Recompute candidates at ~6 Hz (the screen-space dedup + visibility
+			// filter is O(n) per tick; cheap).
+			if (performance.now() - lastLabelTime > 160) {
 				lastLabelTime = performance.now();
 				const camX = camera.position.x,
 					camY = camera.position.y,
 					camZ = camera.position.z;
-				// Account for stars.rotation.y when computing world-space dist
 				const cos = Math.cos(stars.rotation.y);
 				const sin = Math.sin(stars.rotation.y);
 
 				const found: Array<[number, number]> = []; // [idx, dist2]
 				for (let i = 0; i < n; i++) {
-					// Rotate the local star pos into world space
 					const lx = positions[3 * i],
 						ly = positions[3 * i + 1],
 						lz = positions[3 * i + 2];
@@ -468,18 +481,18 @@
 					if (d2 < LABEL_MAX_DIST_SQ) found.push([i, d2]);
 				}
 				found.sort((a, b) => a[1] - b[1]);
-				const top = found.slice(0, LABEL_K * 2);
 
-				// Project each to NDC, filter to those actually in front of camera
-				// + within the viewport
-				const newLabels: Array<{
+				// Project candidates, dedup by screen distance, pick K.
+				type Candidate = {
+					id: string;
 					title: string;
 					x: number;
 					y: number;
-					opacity: number;
-					id: string;
-				}> = [];
-				for (const [i, d2] of top) {
+					op: number;
+				};
+				const accepted: Candidate[] = [];
+				for (const [i, d2] of found) {
+					if (accepted.length >= LABEL_K) break;
 					const lx = positions[3 * i],
 						ly = positions[3 * i + 1],
 						lz = positions[3 * i + 2];
@@ -489,19 +502,86 @@
 					if (projV.z <= 0 || projV.z >= 1) continue;
 					const sx = (projV.x + 1) * 0.5;
 					const sy = (1 - projV.y) * 0.5;
-					if (sx < 0.04 || sx > 0.96 || sy < 0.04 || sy > 0.96) continue;
+					if (sx < 0.06 || sx > 0.94 || sy < 0.06 || sy > 0.94) continue;
+					// Dedup
+					let tooClose = false;
+					for (const a of accepted) {
+						const dxs = a.x - sx,
+							dys = a.y - sy;
+						if (dxs * dxs + dys * dys < LABEL_MIN_SCREEN_DIST * LABEL_MIN_SCREEN_DIST) {
+							tooClose = true;
+							break;
+						}
+					}
+					if (tooClose) continue;
 					const d = Math.sqrt(d2);
 					const op = Math.max(0, 1 - d / LABEL_MAX_DIST);
-					newLabels.push({
+					accepted.push({
+						id: String(i),
 						title: data.titles[i],
 						x: sx,
 						y: sy,
-						opacity: op,
-						id: String(i)
+						op
 					});
-					if (newLabels.length >= LABEL_K) break;
 				}
-				labels = newLabels;
+
+				// Update the persistent label map so old labels keep fading out
+				// rather than popping. Mark accepted ids; everything else gets
+				// targetOpacity 0.
+				const acceptedIds = new Set(accepted.map((a) => a.id));
+				for (const a of accepted) {
+					const existing = labelMap.get(a.id);
+					if (existing) {
+						existing.title = a.title;
+						existing.targetX = a.x;
+						existing.targetY = a.y;
+						existing.targetOpacity = a.op;
+					} else {
+						labelMap.set(a.id, {
+							id: a.id,
+							title: a.title,
+							x: a.x,
+							y: a.y,
+							opacity: 0,
+							targetOpacity: a.op,
+							targetX: a.x,
+							targetY: a.y
+						});
+					}
+				}
+				for (const [id, ls] of labelMap) {
+					if (!acceptedIds.has(id)) ls.targetOpacity = 0;
+				}
+			}
+
+			// Smooth fade + position per frame; cull fully-faded entries.
+			let dirty = false;
+			for (const [id, ls] of labelMap) {
+				const dx = ls.targetX - ls.x;
+				const dy = ls.targetY - ls.y;
+				const dop = ls.targetOpacity - ls.opacity;
+				if (Math.abs(dx) > 1e-4 || Math.abs(dy) > 1e-4) dirty = true;
+				ls.x += dx * 0.12;
+				ls.y += dy * 0.12;
+				if (Math.abs(dop) > 0.002) {
+					dirty = true;
+					ls.opacity += dop * 0.06;
+				} else {
+					ls.opacity = ls.targetOpacity;
+				}
+				if (ls.opacity < 0.01 && ls.targetOpacity === 0) {
+					labelMap.delete(id);
+					dirty = true;
+				}
+			}
+			if (dirty) {
+				labels = Array.from(labelMap.values()).map((ls) => ({
+					id: ls.id,
+					title: ls.title,
+					x: ls.x,
+					y: ls.y,
+					opacity: ls.opacity
+				}));
 			}
 
 			renderer.render(scene, camera);
@@ -557,19 +637,23 @@
 	{/if}
 
 	{#if !loading && !error}
-		<!-- Sparse, aesthetic floating titles near the camera -->
+		<!-- Sparse, aesthetic floating titles near the camera. Each is a
+		     tiny frosted-glass card with a leader line back to the star. -->
 		{#each labels as l (l.id)}
 			<div
 				class="absolute pointer-events-none nearby-label"
 				style="
-					left: {l.x * 100}%;
-					top: {l.y * 100}%;
-					transform: translate(12px, -50%);
+					left: {(l.x * 100).toFixed(2)}%;
+					top: {(l.y * 100).toFixed(2)}%;
+					transform: translate(18px, -50%);
 					opacity: {l.opacity.toFixed(3)};
 				"
 			>
-				<span class="leader"></span>
-				<span class="label-text">{l.title}</span>
+				<span class="leader-dot"></span>
+				<span class="leader-line"></span>
+				<span class="label-card">
+					<span class="label-text">{l.title}</span>
+				</span>
 			</div>
 		{/each}
 
@@ -608,33 +692,59 @@
 
 <style>
 	.nearby-label {
-		font-family: 'Instrument Serif', Georgia, serif;
-		font-style: italic;
-		font-size: 0.78rem;
-		color: rgba(245, 247, 250, 0.85);
-		letter-spacing: 0.01em;
-		text-shadow: 0 0 8px rgba(10, 12, 16, 0.95), 0 0 14px rgba(10, 12, 16, 0.7);
 		display: inline-flex;
 		align-items: center;
-		gap: 0.45rem;
+		gap: 0;
 		white-space: nowrap;
 		will-change: opacity, left, top;
+		/* The star anchor — leader starts here, card lives to the right. */
+		margin-left: -6px;
 	}
 
-	.leader {
+	.leader-dot {
 		display: inline-block;
-		width: 18px;
+		width: 5px;
+		height: 5px;
+		border-radius: 999px;
+		background: rgba(245, 247, 250, 0.85);
+		box-shadow: 0 0 6px rgba(245, 247, 250, 0.55);
+		flex-shrink: 0;
+	}
+
+	.leader-line {
+		display: inline-block;
+		width: 22px;
 		height: 1px;
 		background: linear-gradient(
 			90deg,
 			rgba(245, 247, 250, 0.55),
-			rgba(245, 247, 250, 0.08)
+			rgba(245, 247, 250, 0.18)
 		);
+		flex-shrink: 0;
+	}
+
+	.label-card {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.32rem 0.6rem;
+		border-radius: 0.55rem;
+		background: rgba(10, 12, 16, 0.78);
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		backdrop-filter: blur(10px) saturate(140%);
+		-webkit-backdrop-filter: blur(10px) saturate(140%);
+		box-shadow: 0 6px 20px -10px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+		transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 	}
 
 	.label-text {
-		max-width: 26ch;
+		font-family: 'Instrument Serif', Georgia, serif;
+		font-style: italic;
+		font-size: 0.84rem;
+		color: rgba(245, 247, 250, 0.95);
+		letter-spacing: 0.01em;
+		max-width: 28ch;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		line-height: 1;
 	}
 </style>
