@@ -79,7 +79,13 @@
 	class="fixed inset-0 -z-10"
 	style="pointer-events: auto; isolation: isolate;"
 >
-	<MovieSpaceHero height="100vh" points={5000} />
+	<!-- Backdrop mode: no drag, gentle parallax. Just drift + watch. -->
+	<MovieSpaceHero
+		height="100vh"
+		points={5000}
+		enableDrag={false}
+		parallaxStrength={0.25}
+	/>
 </div>
 
 <!-- Top scrim so the hero text reads cleanly against the galaxy -->
@@ -100,7 +106,7 @@
 	>
 		<span class="chip chip-accent" style="pointer-events: auto;">
 			<Sparkles size={11} />
-			drag · drift · hover · 5,000 films in latent space
+			5,000 films · drifting through ALS latent space
 		</span>
 		<h1
 			class="display-xl text-balance mx-auto"

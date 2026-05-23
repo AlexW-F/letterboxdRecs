@@ -4,10 +4,14 @@
 
 	let {
 		height = '70vh',
-		points = 4500
+		points = 4500,
+		enableDrag = true,
+		parallaxStrength = 1.0
 	}: {
 		height?: string;
 		points?: number;
+		enableDrag?: boolean;
+		parallaxStrength?: number;
 	} = $props();
 
 	let container: HTMLDivElement;
@@ -60,7 +64,9 @@
 		renderer.setClearColor(0x000000, 0);
 		container.appendChild(renderer.domElement);
 		renderer.domElement.style.cssText =
-			'width: 100%; height: 100%; display: block; touch-action: none; cursor: grab;';
+			'width: 100%; height: 100%; display: block; touch-action: none; cursor: ' +
+			(enableDrag ? 'grab' : 'default') +
+			';';
 
 		const scene = new THREE.Scene();
 		scene.fog = new THREE.Fog(0x0a0c10, 18, 80);
@@ -304,7 +310,11 @@
 					vDist = -mvPosition.z;
 					// Each link has its own pulse phase via aSeed; both endpoints
 					// share the seed so the whole segment lights together.
-					vPulse = 0.4 + 0.6 * (0.5 + 0.5 * sin(uTime * 0.55 + aSeed * 7.3));
+					// pow(sin, 6) sharpens the wave into a brief flash with a
+					// long dim baseline — galactic-circuit feel.
+					float wave = 0.5 + 0.5 * sin(uTime * 0.85 + aSeed * 11.0);
+					float flash = pow(wave, 6.0);
+					vPulse = 0.18 + 3.2 * flash;
 					gl_Position = projectionMatrix * mvPosition;
 				}
 			`,
@@ -314,8 +324,10 @@
 				varying float vPulse;
 				void main() {
 					float depthFade = 1.0 - smoothstep(14.0, 55.0, vDist);
-					float a = 0.10 * depthFade * vPulse;
-					gl_FragColor = vec4(vColor * 0.85, a);
+					// Hot-white peak during the flash, colored ambient otherwise.
+					vec3 col = mix(vColor * 0.85, vec3(1.0), clamp(vPulse * 0.18, 0.0, 0.7));
+					float a = 0.09 * depthFade * vPulse;
+					gl_FragColor = vec4(col, a);
 				}
 			`,
 			blending: THREE.AdditiveBlending,
@@ -344,6 +356,7 @@
 		let targetParallaxX = 0, targetParallaxY = 0;
 
 		function onPointerDown(e: PointerEvent) {
+			if (!enableDrag) return;
 			isDragging = true;
 			dragX = e.clientX;
 			dragY = e.clientY;
@@ -351,6 +364,7 @@
 			(e.target as HTMLElement).setPointerCapture?.(e.pointerId);
 		}
 		function onPointerUp(e: PointerEvent) {
+			if (!enableDrag) return;
 			isDragging = false;
 			renderer.domElement.style.cursor = 'grab';
 			(e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
@@ -361,8 +375,10 @@
 			const ny = (e.clientY - rect.top) / rect.height;
 			pointer.x = nx * 2 - 1;
 			pointer.y = -(ny * 2 - 1);
-			targetParallaxX = pointer.x * 0.25;
-			targetParallaxY = pointer.y * 0.18;
+			// Multiplied by parallaxStrength so the landing page can dial
+			// the look-follow way down for a more meditative feel.
+			targetParallaxX = pointer.x * 0.25 * parallaxStrength;
+			targetParallaxY = pointer.y * 0.18 * parallaxStrength;
 			if (isDragging) {
 				const dx = e.clientX - dragX;
 				const dy = e.clientY - dragY;
@@ -381,8 +397,10 @@
 			hoveredGenre = null;
 		}
 
-		renderer.domElement.addEventListener('pointerdown', onPointerDown);
-		window.addEventListener('pointerup', onPointerUp);
+		if (enableDrag) {
+			renderer.domElement.addEventListener('pointerdown', onPointerDown);
+			window.addEventListener('pointerup', onPointerUp);
+		}
 		renderer.domElement.addEventListener('pointermove', onPointerMove);
 		renderer.domElement.addEventListener('pointerleave', onPointerLeave);
 
@@ -593,8 +611,10 @@
 		cleanup = () => {
 			cancelAnimationFrame(raf);
 			ro.disconnect();
-			renderer.domElement.removeEventListener('pointerdown', onPointerDown);
-			window.removeEventListener('pointerup', onPointerUp);
+			if (enableDrag) {
+				renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+				window.removeEventListener('pointerup', onPointerUp);
+			}
 			renderer.domElement.removeEventListener('pointermove', onPointerMove);
 			renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
 			geometry.dispose();
