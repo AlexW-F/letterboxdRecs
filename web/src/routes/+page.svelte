@@ -9,7 +9,8 @@
 		Trash2,
 		Sparkles,
 		Loader2,
-		FileText
+		FileText,
+		ChevronDown
 	} from 'lucide-svelte';
 	import FileDropzone from '$lib/components/FileDropzone.svelte';
 	import Avatar from '$lib/components/Avatar.svelte';
@@ -61,47 +62,93 @@
 		clearMembers();
 		members = [];
 	}
+
+	function scrollToForm() {
+		document.getElementById('add-friend')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
 </script>
 
-<section class="relative">
-	<!-- 3D hero — fly through the actual ALS latent space rendered with
-	     Three.js. Drift camera + mouse parallax + drag-to-look + hover
-	     picking via raycaster. Soft additive-blended stars with depth fog. -->
-	<div class="relative -mx-4 sm:-mx-6 mb-2 anim-fade-up">
-		<MovieSpaceHero height="68vh" points={4500} />
-	</div>
+<!--
+  Landing page is a galaxy backdrop with content layered on top. The
+  Three.js canvas is fixed full-viewport; content blocks float above
+  with `pointer-events: none` on non-interactive copy so drag-to-spin
+  reaches the canvas through dead space.
+-->
 
-	<div class="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
-		<div
-			class="absolute -top-24 left-1/3 w-[60vw] h-[60vw] max-w-[700px] max-h-[700px] rounded-full"
-			style="background: radial-gradient(circle, rgba(52, 211, 153, 0.12), transparent 60%); filter: blur(40px);"
-		></div>
-		<div
-			class="absolute top-32 right-0 w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] rounded-full"
-			style="background: radial-gradient(circle, rgba(167, 139, 250, 0.10), transparent 60%); filter: blur(50px);"
-		></div>
-	</div>
+<div
+	class="fixed inset-0 -z-10"
+	style="pointer-events: auto; isolation: isolate;"
+>
+	<MovieSpaceHero height="100vh" points={5000} />
+</div>
 
-	<div class="anim-fade-up space-y-4 pb-10" style="animation-delay: 80ms;">
-		<span class="chip chip-accent">
+<!-- Top scrim so the hero text reads cleanly against the galaxy -->
+<div
+	class="fixed inset-x-0 top-0 -z-[5] pointer-events-none"
+	style="height: 60vh; background: radial-gradient(ellipse at top center, rgba(10, 12, 16, 0.55) 0%, transparent 70%);"
+></div>
+
+<!-- pointer-events: none lets drag/hover fall through to the galaxy
+     canvas where there isn't an interactive element. Surfaces + buttons
+     re-enable pointer-events explicitly. -->
+<section class="relative" style="z-index: 1; pointer-events: none;">
+	<!-- Hero — text floats over the galaxy. pointer-events: none lets the
+	     user drag/spin the canvas behind it without dead zones. -->
+	<div
+		class="anim-fade-up text-center min-h-[78vh] flex flex-col items-center justify-center space-y-5 pb-12"
+		style="pointer-events: none;"
+	>
+		<span class="chip chip-accent" style="pointer-events: auto;">
 			<Sparkles size={11} />
-			4,500 films above · drift, drag, hover · the latent space your taste lives in
+			drag · drift · hover · 5,000 films in latent space
 		</span>
-		<h1 class="display-xl text-balance" style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic;">
-			Movie recommendations <br class="hidden md:block" />
+		<h1
+			class="display-xl text-balance mx-auto"
+			style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic; max-width: 24ch; text-shadow: 0 0 40px rgba(10, 12, 16, 0.85);"
+		>
+			Movie recommendations <br />
 			<span class="text-gradient">your whole group</span> will love.
 		</h1>
-		<p class="text-balance max-w-2xl" style="color: var(--ink-muted); font-size: 1.05rem; line-height: 1.55;">
-			Each friend uploads their Letterboxd export. The backend folds everyone into the 64-dim
-			latent space you see above, blends in Tag Genome 2021 relevance and TMDB plot embeddings,
-			then re-ranks for diversity and popularity-debiased semantic alignment. Six aggregation
-			strategies including our <span class="chip chip-violet ml-1">group_taste_vector</span>
-			which picks films <em>nobody would have chosen alone</em> but everyone will love.
+		<p
+			class="text-balance max-w-2xl mx-auto"
+			style="color: var(--ink-muted); font-size: 1.05rem; line-height: 1.55; text-shadow: 0 0 20px rgba(10, 12, 16, 0.75);"
+		>
+			Each friend uploads their Letterboxd export. The backend folds everyone into the latent
+			space you're hovering through, blends in Tag Genome relevance + TMDB plot embeddings, then
+			re-ranks for diversity, popularity-debiased semantic alignment, and group fairness.
 		</p>
+		<div class="flex flex-wrap items-center gap-3 justify-center" style="pointer-events: auto;">
+			<button class="btn btn-primary" onclick={scrollToForm}>
+				<UserPlus size={15} />
+				Add a friend
+			</button>
+			<button class="btn btn-ghost" onclick={() => goto('/me')}>
+				Just me →
+			</button>
+		</div>
+		<button
+			type="button"
+			class="text-xs flex items-center gap-1 opacity-70 hover:opacity-100 transition mt-6"
+			style="color: var(--ink-dim); pointer-events: auto;"
+			onclick={scrollToForm}
+			aria-label="scroll to upload form"
+		>
+			<ChevronDown size={14} class="animate-bounce" />
+			scroll · upload below
+		</button>
 	</div>
 
-	<div class="grid grid-cols-1 md:grid-cols-5 gap-4 anim-fade-up" style="animation-delay: 80ms;">
-		<div class="surface p-5 md:col-span-3 space-y-4">
+	<!-- Upload + group panel. Frosted-glass surface keeps content readable
+	     over the galaxy. -->
+	<div
+		id="add-friend"
+		class="grid grid-cols-1 md:grid-cols-5 gap-4 anim-fade-up scroll-mt-24"
+		style="animation-delay: 80ms;"
+	>
+		<div
+			class="surface p-5 md:col-span-3 space-y-4"
+			style="background: rgba(10, 12, 16, 0.72); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); pointer-events: auto;"
+		>
 			<div class="flex items-center gap-2">
 				<UserPlus size={18} style="color: var(--brand);" />
 				<h2 class="text-lg font-medium">Add a friend</h2>
@@ -148,7 +195,10 @@
 			{/if}
 		</div>
 
-		<div class="md:col-span-2 surface p-5 flex flex-col">
+		<div
+			class="md:col-span-2 surface p-5 flex flex-col"
+			style="background: rgba(10, 12, 16, 0.72); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); pointer-events: auto;"
+		>
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-2">
 					<UsersIcon size={18} style="color: var(--violet);" />
@@ -182,7 +232,7 @@
 				{#each members as m, i (m.hash + i)}
 					<div
 						class="flex items-center gap-3 px-2 py-2 rounded-lg card-hover surface"
-						style="border-radius: 0.6rem;"
+						style="border-radius: 0.6rem; background: rgba(255, 255, 255, 0.04);"
 						in:fly={{ y: -8, duration: 220 }}
 						animate:flip={{ duration: 220 }}
 					>
@@ -226,5 +276,43 @@
 				</button>
 			</div>
 		</div>
+	</div>
+
+	<!-- Pitch row underneath, also over the galaxy -->
+	<div
+		class="mt-10 grid grid-cols-1 md:grid-cols-3 gap-3"
+		style="z-index: 1;"
+	>
+		{#each [
+			{
+				title: 'Six aggregation strategies',
+				body: 'average · least_misery · most_pleasure · consensus · hybrid · and our group_taste_vector that fuses everyone into a super-user.',
+				tint: 'chip-violet'
+			},
+			{
+				title: 'Three content scorers',
+				body: 'Tag Genome 2021 (1,084 curated tags) · TMDB plot sentence-embeddings · IMDb director one-hots. Per-scorer weights tunable.',
+				tint: 'chip-brand'
+			},
+			{
+				title: 'Personal 3D in /explore',
+				body: 'Your folded-in taste vector projected into the same UMAP space, with your rated films visible around you.',
+				tint: 'chip-accent'
+			}
+		] as item, i (item.title)}
+			<div
+				class="surface p-4 card-hover anim-fade-up"
+				style="
+					background: rgba(10, 12, 16, 0.65);
+					backdrop-filter: blur(12px);
+					-webkit-backdrop-filter: blur(12px);
+					animation-delay: {120 + i * 50}ms;
+					pointer-events: auto;
+				"
+			>
+				<span class="chip {item.tint}">{item.title}</span>
+				<p class="text-sm mt-3" style="color: var(--ink-muted); line-height: 1.5;">{item.body}</p>
+			</div>
+		{/each}
 	</div>
 </section>
