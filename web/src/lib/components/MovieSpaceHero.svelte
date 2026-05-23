@@ -89,6 +89,9 @@
 		const sizes = new Float32Array(raw.length);
 
 		const c = new THREE.Color();
+		// Per-star seed (0..1) for twinkle phase offset.
+		const seeds = new Float32Array(raw.length);
+
 		// Slight per-point size variation by popularity gives the cloud a
 		// near-field / far-field star feel; popular films are visibly larger.
 		const popMax = Math.max(...data.popularity);
@@ -98,54 +101,83 @@
 			positions[3 * i + 2] = (raw[i][2] - cz) * scale;
 			const hex = data.genre_colors[data.genres[i]] ?? '#cccccc';
 			c.set(hex);
+			// Saturate colors so they read against the dark scene.
+			const hsl = { h: 0, s: 0, l: 0 };
+			c.getHSL(hsl);
+			c.setHSL(hsl.h, Math.min(1, hsl.s * 1.4 + 0.1), Math.max(0.55, Math.min(0.75, hsl.l)));
 			colors[3 * i] = c.r;
 			colors[3 * i + 1] = c.g;
 			colors[3 * i + 2] = c.b;
-			// Size scales loosely with log(popularity); range ~0.7–2.2.
+			// Size scales loosely with log(popularity); range ~0.55–2.6.
 			const popN = Math.log1p(data.popularity[i]) / Math.log1p(popMax);
-			sizes[i] = 0.7 + popN * 1.5;
+			sizes[i] = 0.55 + popN * 2.05;
+			seeds[i] = Math.random();
 		}
 
 		const geometry = new THREE.BufferGeometry();
 		geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 		geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 		geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+		geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
 
 		// ---------------------------------------------------------------
-		// Soft circular sprite via shader. Additive blending so overlaps
-		// glow brighter — like the milky way.
+		// Galaxy-star shader — bright core + wide exponential halo, with
+		// per-star twinkle, depth fade, and additive blending so dense
+		// regions naturally bloom brighter.
 		// ---------------------------------------------------------------
 		const starMaterial = new THREE.ShaderMaterial({
 			uniforms: {
 				uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
-				uSize: { value: 38.0 },
+				uSize: { value: 90.0 },
 				uTime: { value: 0 }
 			},
-			vertexShader: `
+			vertexShader: /* glsl */ `
 				attribute float aSize;
+				attribute float aSeed;
 				varying vec3 vColor;
 				varying float vDist;
+				varying float vTwinkle;
 				uniform float uPixelRatio;
 				uniform float uSize;
+				uniform float uTime;
 				void main() {
 					vColor = color;
 					vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
 					vDist = -mvPosition.z;
+					// Smoothly modulate per-star brightness 0.7..1.15 with a low-
+					// frequency sinusoid offset by the star's own seed.
+					vTwinkle = 0.85 + 0.30 * sin(uTime * 1.3 + aSeed * 18.0);
 					gl_Position = projectionMatrix * mvPosition;
-					gl_PointSize = uSize * aSize * uPixelRatio / -mvPosition.z;
+					// Bigger close stars — divide by depth, clamp by GPU limit.
+					gl_PointSize = uSize * aSize * uPixelRatio / max(2.0, -mvPosition.z);
 				}
 			`,
-			fragmentShader: `
+			fragmentShader: /* glsl */ `
 				varying vec3 vColor;
 				varying float vDist;
+				varying float vTwinkle;
 				void main() {
-					vec2 d = gl_PointCoord - vec2(0.5);
-					float r2 = dot(d, d);
-					if (r2 > 0.25) discard;
-					float alpha = smoothstep(0.25, 0.0, r2);
-					// Slight depth-based brightness — closer stars feel more alive.
-					float depthFade = 1.0 - smoothstep(20.0, 70.0, vDist);
-					gl_FragColor = vec4(vColor, alpha * (0.65 + 0.35 * depthFade));
+					// 0 at center, 1 at the edge of the point square.
+					vec2 d = gl_PointCoord - 0.5;
+					float r = length(d) * 2.0;
+					if (r > 1.0) discard;
+
+					// Wide soft halo: rapid exponential falloff. This is what
+					// gives the galaxy-glow when many overlap.
+					float halo = exp(-r * 3.4);
+
+					// Tight bright core: highly peaked near r=0.
+					float core = pow(1.0 - r, 7.0);
+
+					// Whiten the core a touch — real stars look hotter at center.
+					vec3 col = mix(vColor, vec3(1.0), core * 0.55);
+					float intensity = (halo * 0.75 + core * 2.2) * vTwinkle;
+
+					// Depth fade so distant stars dissolve into the fog.
+					float depthFade = 1.0 - smoothstep(22.0, 72.0, vDist);
+					intensity *= 0.45 + 0.55 * depthFade;
+
+					gl_FragColor = vec4(col * intensity, intensity);
 				}
 			`,
 			blending: THREE.AdditiveBlending,
@@ -157,19 +189,53 @@
 		const stars = new THREE.Points(geometry, starMaterial);
 		scene.add(stars);
 
-		// A second, smaller "core glow" pass — same points rendered tinier with
-		// stronger additive blending creates the soft halo around bright stars.
-		const haloMaterial = new THREE.PointsMaterial({
-			size: 0.85,
-			vertexColors: true,
-			transparent: true,
-			opacity: 0.55,
+		// Second pass — much bigger, softer points for the diffuse glow
+		// around dense regions. Together with additive blending this is
+		// what turns "scatter plot" into "galaxy".
+		const glowMaterial = new THREE.ShaderMaterial({
+			uniforms: {
+				uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+				uSize: { value: 260.0 },
+				uTime: { value: 0 }
+			},
+			vertexShader: /* glsl */ `
+				attribute float aSize;
+				varying vec3 vColor;
+				varying float vDist;
+				uniform float uPixelRatio;
+				uniform float uSize;
+				void main() {
+					vColor = color;
+					vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+					vDist = -mvPosition.z;
+					gl_Position = projectionMatrix * mvPosition;
+					gl_PointSize = uSize * aSize * uPixelRatio / max(2.0, -mvPosition.z);
+				}
+			`,
+			fragmentShader: /* glsl */ `
+				varying vec3 vColor;
+				varying float vDist;
+				void main() {
+					vec2 d = gl_PointCoord - 0.5;
+					float r = length(d) * 2.0;
+					if (r > 1.0) discard;
+					// Pure exponential, very soft — invisible at the edges, faintly
+					// tinted near the center. Many overlapping copies blend into
+					// dust lanes.
+					float glow = exp(-r * 5.0) * 0.18;
+					float depthFade = 1.0 - smoothstep(25.0, 80.0, vDist);
+					glow *= 0.4 + 0.6 * depthFade;
+					gl_FragColor = vec4(vColor * glow, glow);
+				}
+			`,
 			blending: THREE.AdditiveBlending,
 			depthWrite: false,
-			sizeAttenuation: true
+			transparent: true,
+			vertexColors: true
 		});
-		const halo = new THREE.Points(geometry, haloMaterial);
-		scene.add(halo);
+
+		const glow = new THREE.Points(geometry, glowMaterial);
+		scene.add(glow);
 
 		// ---------------------------------------------------------------
 		// Pick: raycaster for hover tooltips
@@ -267,6 +333,7 @@
 		const animate = () => {
 			const t = (performance.now() - start) / 1000;
 			starMaterial.uniforms.uTime.value = t;
+			glowMaterial.uniforms.uTime.value = t;
 
 			// Cinematic Lissajous-ish drift through the cloud — the camera lives
 			// near the cloud's center but slowly weaves around so the parallax
@@ -292,7 +359,7 @@
 			// Spin the cloud itself, very slowly — adds passive motion when the
 			// user is hovering and the camera path is paused-ish.
 			stars.rotation.y = t * 0.012;
-			halo.rotation.y = t * 0.012;
+			glow.rotation.y = t * 0.012;
 
 			// Picking: throttle to ~30 Hz so this doesn't blow CPU on big clouds.
 			if (performance.now() - lastPickTime > 33 && pointer.x > -1.5) {
@@ -326,7 +393,7 @@
 			renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
 			geometry.dispose();
 			starMaterial.dispose();
-			haloMaterial.dispose();
+			glowMaterial.dispose();
 			renderer.dispose();
 			renderer.domElement.remove();
 		};
