@@ -770,7 +770,7 @@
 	}
 
 	.label-text {
-		font-family: 'Instrument Serif', Georgia, serif;
+		font-family: 'Playfair Display', Georgia, serif;
 		font-style: italic;
 		font-size: 0.84rem;
 		color: rgba(245, 247, 250, 0.95);

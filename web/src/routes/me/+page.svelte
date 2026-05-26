@@ -17,8 +17,6 @@
 	let modes = $state<Mode[]>([]);
 	let mode = $state('balanced');
 	let topN = $state(12);
-	let excludeRated = $state(true);
-	let excludeWatched = $state(true);
 
 	let ratingsFile = $state<File | null>(null);
 	let watchedFile = $state<File | null>(null);
@@ -52,8 +50,8 @@
 				hash: hash!,
 				mode,
 				top_n: topN,
-				exclude_rated: excludeRated,
-				exclude_watched: excludeWatched
+				exclude_rated: true,
+				exclude_watched: true
 			});
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -73,8 +71,8 @@
 				hash,
 				mode,
 				top_n: topN,
-				exclude_rated: excludeRated,
-				exclude_watched: excludeWatched
+				exclude_rated: true,
+				exclude_watched: true
 			});
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -96,7 +94,7 @@
 	<header class="flex items-end justify-between flex-wrap gap-3">
 		<div>
 			<span class="chip chip-brand">Solo · personalized re-rank</span>
-			<h1 class="display-md mt-2" style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic;">
+			<h1 class="display-md mt-2" style="font-family: 'Playfair Display', Georgia, serif; font-style: italic;">
 				Recommendations <span class="text-gradient">for one</span>.
 			</h1>
 			<p class="text-sm" style="color: var(--ink-muted);">
@@ -126,6 +124,25 @@
 				bind:file={watchedFile}
 				hint="excludes watched-but-unrated films from recs"
 			/>
+			<div
+				class="text-[11px] rounded-md px-3 py-2 leading-relaxed"
+				style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); color: var(--ink-muted);"
+			>
+				<div class="font-medium" style="color: var(--ink-dim);">Where to find your CSVs</div>
+				<div class="mt-1">
+					On letterboxd.com: <strong>your profile → Settings → Data → Export your data</strong>.
+					Unzip — drop <code>ratings.csv</code> (and optionally <code>watched.csv</code>) here.
+				</div>
+				<a
+					href="https://letterboxd.com/settings/data/"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="inline-block mt-1.5 underline"
+					style="color: var(--brand);"
+				>
+					open Letterboxd data settings →
+				</a>
+			</div>
 			{#if error}
 				<p
 					class="text-sm rounded-md px-3 py-2"
@@ -184,21 +201,12 @@
 					<input
 						type="number"
 						min="1"
-						max="50"
+						max="100"
 						bind:value={topN}
 						class="input"
 						style="width: 5rem; padding: 0.3rem 0.5rem;"
 					/>
 				</label>
-				<label class="flex items-center gap-2 cursor-pointer">
-					<input type="checkbox" bind:checked={excludeRated} />
-					<span style="color: var(--ink-muted);">exclude rated</span>
-				</label>
-				<label class="flex items-center gap-2 cursor-pointer">
-					<input type="checkbox" bind:checked={excludeWatched} />
-					<span style="color: var(--ink-muted);">exclude watched</span>
-				</label>
-
 				<div class="ml-auto flex gap-2">
 					<button class="btn btn-ghost btn-pill text-xs" onclick={reset}>
 						<RotateCcw size={12} />
@@ -240,9 +248,30 @@
 						title={r.title}
 						score={r.score}
 						explanation={r.explanation}
+						breakdown={r.breakdown}
 					/>
 				{/each}
 			</div>
+
+			{#if topN < 100 && result.recommendations.length >= topN}
+				<div class="flex justify-center pt-1">
+					<button
+						class="btn btn-ghost btn-pill text-xs"
+						onclick={() => {
+							topN = Math.min(topN + 12, 100);
+							rerecommend();
+						}}
+						disabled={busy}
+					>
+						{#if busy}
+							<Loader2 size={12} class="animate-spin" />
+							loading…
+						{:else}
+							Show {Math.min(12, 100 - topN)} more
+						{/if}
+					</button>
+				</div>
+			{/if}
 		{/if}
 	{/if}
 </section>

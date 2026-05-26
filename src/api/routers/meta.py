@@ -18,6 +18,7 @@ MODE_DESCRIPTIONS = {
     "niche": "Hidden gems that fit your taste. Strong popularity penalty, but quality floor stays high.",
     "popular": "Canon and crowd-pleasers, ranked by what users with similar taste rate highly.",
     "serendipitous": "Surprising picks that still sit adjacent to your taste — wider net, higher diversity.",
+    "calibrated": "Genre distribution matches your taste — if you're 70% drama, you get ~70% drama back, not aggressive anti-redundancy.",
 }
 
 

@@ -56,6 +56,7 @@ class GroupScoredCandidate:
     per_member_score: Dict[str, float]   # name -> normalized rerank score (only for members who could score it)
     fairness: float                       # CV across per_member_score (lower = more uniform)
     explanation: Explanation
+    breakdown: Dict[str, float] = field(default_factory=dict)  # signal-level contributions: svd/als/content/popularity_penalty/implicit_bonus/diversity_penalty
 
 
 class GroupReranker:
@@ -76,6 +77,7 @@ class GroupReranker:
         mode: str,
         exclude_rated: bool = True,
         exclude_watched: bool = True,
+        extra_exclude: Optional[set] = None,
     ) -> Tuple[Dict[str, float], Dict[str, float]]:
         """Score an explicit candidate set for this member.
 
@@ -92,11 +94,18 @@ class GroupReranker:
             kept_candidates -= {str(m) for m in user_ratings}
         if exclude_watched and watched:
             kept_candidates -= {str(m) for m in watched}
+        if extra_exclude:
+            kept_candidates -= {str(m) for m in extra_exclude}
+        # When the union intentionally includes seen films, ALS must score
+        # them too — otherwise this member's contribution to a known-loved
+        # film is silently dropped from the aggregate.
+        als_filter_seen = exclude_rated or exclude_watched
         scores = self.rr.score_specific(
             user_ratings=user_ratings,
             watched_movies=watched,
             candidate_ids=kept_candidates,
             mode=mode,
+            filter_seen=als_filter_seen,
         )
         return scores, {}
 
@@ -144,6 +153,7 @@ class GroupReranker:
         top_n: int,
         exclude_rated: bool = True,
         exclude_watched: bool = True,
+        exclude_seen_by_any: bool = False,
     ) -> List[GroupScoredCandidate]:
         """Merge all members' positive ratings into one super-user and run
         the reranker against that. Aggregate per-member scores afterwards
@@ -202,11 +212,101 @@ class GroupReranker:
                 per_member_score={k: round(v, 4) for k, v in member_view.items()},
                 fairness=round(fairness, 4),
                 explanation=cand.explanation,
+                breakdown={k: round(float(v), 4) for k, v in cand.breakdown.items()},
             ))
         return out[:top_n]
 
     # ------------------------------------------------------------------
-    # Public entry point
+    # Shared candidate-construction (used by both recommend and
+    # recommend_disagreement). Returns GroupScoredCandidates with
+    # score=mean(per_member). Callers re-score and sort per their needs.
+    # ------------------------------------------------------------------
+
+    def _build_union_candidates(
+        self,
+        members: List[Tuple[str, Dict[str, float], Optional[Iterable[str]]]],
+        mode: str,
+        candidate_top_n_per_member: int,
+        exclude_rated: bool = True,
+        exclude_watched: bool = True,
+        exclude_seen_by_any: bool = False,
+    ) -> List[GroupScoredCandidate]:
+        # If strict-union exclusion is on, build the global seen set once.
+        global_seen: Optional[set] = None
+        if exclude_seen_by_any:
+            global_seen = set()
+            for _name, ratings, watched in members:
+                global_seen |= {str(m) for m in ratings}
+                if watched:
+                    global_seen |= {str(m) for m in watched}
+
+        # 1) Per-member candidate proposals (post-rerank top-N).
+        per_member_top: Dict[str, List[ScoredCandidate]] = {}
+        for name, ratings, watched in members:
+            per_member_top[name] = self.rr.recommend(
+                user_ratings=ratings, watched_movies=watched,
+                mode=mode, top_n=candidate_top_n_per_member,
+                exclude_rated=exclude_rated,
+                exclude_watched=exclude_watched,
+                extra_exclude=global_seen,
+            )
+
+        # 2) Candidate union.
+        union_ids: set = set()
+        for recs in per_member_top.values():
+            union_ids.update(c.movie_id for c in recs)
+
+        # 3) Score each member over the full union (no zero-fill).
+        per_member_scores: Dict[str, Dict[str, float]] = {}
+        for name, ratings, watched in members:
+            scores, _ = self._score_member_over_union(
+                ratings, watched, union_ids, mode,
+                exclude_rated=exclude_rated, exclude_watched=exclude_watched,
+                extra_exclude=global_seen,
+            )
+            per_member_scores[name] = scores
+
+        # 4) Per-member min-max normalization — different members' score
+        #    scales otherwise dominate aggregation/std calculations.
+        for name in per_member_scores:
+            per_member_scores[name] = _minmax(per_member_scores[name])
+
+        # 5) Assemble candidate records.
+        out: List[GroupScoredCandidate] = []
+        for mid in union_ids:
+            contributing = {
+                name: per_member_scores[name][mid]
+                for name in per_member_scores
+                if mid in per_member_scores[name]
+            }
+            if not contributing:
+                continue
+            # Explanation + breakdown sourced from the first per-member-top
+            # entry that has this candidate (movie-level facts).
+            explanation = Explanation(popularity_tier=self.rr.popularity.tier(mid))
+            breakdown: Dict[str, float] = {}
+            for name, recs in per_member_top.items():
+                for c in recs:
+                    if c.movie_id == mid:
+                        explanation = c.explanation
+                        breakdown = dict(c.breakdown)
+                        break
+                if explanation.source:
+                    break
+            arr = np.asarray(list(contributing.values()), dtype=np.float64)
+            out.append(GroupScoredCandidate(
+                movie_id=mid,
+                title=self.rr.titles.get(mid, mid),
+                score=float(arr.mean()),  # default; callers may overwrite
+                per_member_score={k: round(v, 4) for k, v in contributing.items()},
+                fairness=round(self._fairness(list(contributing.values())), 4),
+                explanation=explanation,
+                breakdown={k: round(float(v), 4) for k, v in breakdown.items()},
+            ))
+        return out
+
+    # ------------------------------------------------------------------
+    # Public entry points
     # ------------------------------------------------------------------
 
     def recommend(
@@ -218,6 +318,7 @@ class GroupReranker:
         fairness_weight: float = 0.5,
         exclude_rated: bool = True,
         exclude_watched: bool = True,
+        exclude_seen_by_any: bool = False,
     ) -> List[GroupScoredCandidate]:
         """``members`` is a list of (name, ratings_dict, watched_iter_or_none)."""
         if strategy not in GROUP_STRATEGIES:
@@ -231,73 +332,64 @@ class GroupReranker:
             return self._group_taste_vector_recommend(
                 members, mode=mode, top_n=top_n,
                 exclude_rated=exclude_rated, exclude_watched=exclude_watched,
+                exclude_seen_by_any=exclude_seen_by_any,
             )
 
-        # 1) Each member proposes candidates via the reranker (post-rerank top-N).
-        per_member_top: Dict[str, List[ScoredCandidate]] = {}
-        for name, ratings, watched in members:
-            per_member_top[name] = self.rr.recommend(
-                user_ratings=ratings, watched_movies=watched,
-                mode=mode, top_n=top_n * 5,
-                exclude_rated=exclude_rated,
-                exclude_watched=exclude_watched,
-            )
+        candidates = self._build_union_candidates(
+            members, mode=mode,
+            candidate_top_n_per_member=top_n * 5,
+            exclude_rated=exclude_rated, exclude_watched=exclude_watched,
+            exclude_seen_by_any=exclude_seen_by_any,
+        )
 
-        # 2) Candidate union — anything any member ranked into their top-(5N).
-        union_ids: set = set()
-        for recs in per_member_top.values():
-            union_ids.update(c.movie_id for c in recs)
-
-        # 3) For each member, expand to score every candidate (no zero-fill).
-        per_member_scores: Dict[str, Dict[str, float]] = {}
-        for name, ratings, watched in members:
-            scores, _ = self._score_member_over_union(
-                ratings, watched, union_ids, mode,
-                exclude_rated=exclude_rated, exclude_watched=exclude_watched,
-            )
-            per_member_scores[name] = scores
-
-        # 4) Normalize per-member scores into [0, 1] so different members'
-        #    score scales don't dominate aggregation.
-        for name in per_member_scores:
-            per_member_scores[name] = _minmax(per_member_scores[name])
-
-        # 5) Aggregate.
+        # Re-score via the chosen aggregation strategy. `least_misery`
+        # requires every member to have a score for the candidate; the
+        # minimum is misleading otherwise.
         results: List[GroupScoredCandidate] = []
-        for mid in union_ids:
-            contributing = {
-                name: per_member_scores[name][mid]
-                for name in per_member_scores
-                if mid in per_member_scores[name]
-            }
-            if not contributing:
+        for c in candidates:
+            if strategy == "least_misery" and len(c.per_member_score) < len(members):
                 continue
-            # For least_misery, require all members to have scored it;
-            # otherwise the "minimum" is misleading.
-            if strategy == "least_misery" and len(contributing) < len(members):
-                continue
-            agg = self._aggregate(list(contributing.values()), strategy,
-                                  fairness_weight=fairness_weight)
-            fairness = self._fairness(list(contributing.values()))
-            # Build an explanation from the first member who has a rerank
-            # entry for this candidate (any will do — explanations describe
-            # the *movie*, not the member).
-            explanation = Explanation(popularity_tier=self.rr.popularity.tier(mid))
-            for name, recs in per_member_top.items():
-                for c in recs:
-                    if c.movie_id == mid:
-                        explanation = c.explanation
-                        break
-                if explanation.source:
-                    break
-            results.append(GroupScoredCandidate(
-                movie_id=mid,
-                title=self.rr.titles.get(mid, mid),
-                score=float(agg),
-                per_member_score={k: round(v, 4) for k, v in contributing.items()},
-                fairness=round(fairness, 4),
-                explanation=explanation,
-            ))
+            agg = self._aggregate(
+                list(c.per_member_score.values()),
+                strategy,
+                fairness_weight=fairness_weight,
+            )
+            c.score = float(agg)
+            results.append(c)
 
         results.sort(key=lambda c: c.score, reverse=True)
         return results[:top_n]
+
+    def recommend_disagreement(
+        self,
+        members: List[Tuple[str, Dict[str, float], Optional[Iterable[str]]]],
+        mode: str = "balanced",
+        top_n: int = 10,
+        exclude_rated: bool = True,
+        exclude_watched: bool = True,
+    ) -> List[GroupScoredCandidate]:
+        """High-variance picks — items where one member loves it and another
+        would skip. Requires every member to have a score for the item; std
+        across one or two members is meaningless. Score stays as mean (so
+        the card still conveys "is this any good overall?") and the
+        per-member breakdown carries the disagreement."""
+        if not members:
+            return []
+        # Larger candidate pool than `recommend` — disagreement picks often
+        # live further down each member's individual ranking than the
+        # consensus picks do.
+        candidates = self._build_union_candidates(
+            members, mode=mode,
+            candidate_top_n_per_member=top_n * 8,
+            exclude_rated=exclude_rated, exclude_watched=exclude_watched,
+        )
+        full_only = [c for c in candidates if len(c.per_member_score) == len(members)]
+        if not full_only:
+            return []
+
+        def _std(c: GroupScoredCandidate) -> float:
+            arr = np.asarray(list(c.per_member_score.values()), dtype=np.float64)
+            return float(arr.std())
+
+        full_only.sort(key=_std, reverse=True)
+        return full_only[:top_n]

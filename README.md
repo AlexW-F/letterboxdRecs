@@ -1,273 +1,165 @@
 # letterboxdRecs
 
-## COLLABORATIVE FILTERING RECOMMENDATION ENGINE
-• Implemented multiple algorithm support including KNN (Basic, WithMeans, Baseline) and SVD-based (SVD, SVD++) collaborative filtering
-• Built comprehensive hyperparameter search with early stopping and overfitting detection across 50+ parameter combinations  
-• Architected train/validation/test splits with robust evaluation metrics for model comparison
-• Optimized recommendation generation using matrix factorization fold-in techniques for new users
+**movienight** — a group movie-recommendation web app built on Letterboxd exports + the MovieLens 32M dataset. Friends each contribute their watch history (Letterboxd username via RSS, or full CSV export); the backend folds everyone into the same ALS latent space, blends in Tag Genome relevance and TMDB plot embeddings, and produces a re-ranked group recommendation list with per-member fairness controls. Includes a shareable join link with QR code, real-time voting on the shortlist, a "shared watchlist" overlap view, and a 3D UMAP visualization of your taste in latent space.
 
-A collaborative filtering recommendation system that combines MovieLens community data with personal Letterboxd ratings to generate personalized movie recommendations.
+Repo: [github.com/AlexW-F/letterboxdRecs](https://github.com/AlexW-F/letterboxdRecs)
 
-## Features
+## What you can do
 
-- **Multiple Algorithm Support**: KNN (Basic, WithMeans, Baseline) and SVD-based (SVD, SVD++) collaborative filtering
-- **Letterboxd Integration**: Import your Letterboxd ratings and watched history
-- **TMDB Enrichment**: Automatically map Letterboxd movies to MovieLens dataset via TMDB IDs
-- **Hyperparameter Tuning**: Automated grid search for optimal model parameters
-- **Cross-Validation**: Robust model evaluation with k-fold cross-validation
-- **Seeding System**: Generate reproducible and diverse recommendation sets
-- **Group Recommendations**: Support for generating recommendations for multiple users
+- **Group movie night.** One person clicks *Start a shared group* → gets a URL + QR code → friends join from their phones with a Letterboxd username (no upload needed) or a CSV export. The group recs page shows top picks plus three lenses: high-disagreement "argue about this" films, films *no one* has seen yet, and a shared-watchlist overlap. Each member can thumbs-up / veto from their device; the highest net vote surfaces as the group pick.
+- **Solo recs.** Upload your Letterboxd export once, get personalized recommendations across five modes (`balanced`, `niche`, `popular`, `serendipitous`, `calibrated`) with per-rec explanations showing which signal (SVD / ALS / Tag Genome / popularity-debias / diversity) drove the pick.
+- **Compatibility report.** Pairwise Pearson correlation on shared ratings + cosine similarity of TF-IDF taste vectors, plus strict consensus picks (mean ≥ 3.5★, σ ≤ 0.75) vs disagreement picks (σ ≥ 1.0★) — no longer the same films appearing on both lists.
+- **3D movie space.** Personalized UMAP projection of the ALS latent space with your rated films highlighted and your folded-in taste vector plotted as a marker.
 
-## Project Structure
+## Architecture
 
 ```
 letterboxdRecs/
-├── src/                          # Core library code
-│   ├── __init__.py
-│   ├── config.py                 # Configuration and constants
-│   ├── data_processing.py        # Data loading and preprocessing
-│   ├── data_enrichment.py        # TMDB integration and data enrichment
-│   ├── model_training.py         # Model training and evaluation
-│   └── recommendations.py        # Recommendation generation
-├── notebooks/                    # Jupyter notebooks for experiments
-│   ├── 01_data_exploration.ipynb
-│   ├── 02_model_training.ipynb
-│   └── 03_recommendations.ipynb
-├── models/                       # Saved trained models
-├── data/                         # Processed datasets
-├── alex_data/                    # User's Letterboxd export data
-├── ml-latest-small/              # MovieLens small dataset
-├── ml-32m/                       # MovieLens 32M dataset
-└── requirements.txt              # Python dependencies
+├── src/
+│   ├── reranking.py         # hybrid CF (SVD + ALS) + content + MMR / calibrated diversity
+│   ├── group_reranker.py    # 6 strategies including the latent-space group_taste_vector
+│   ├── content_features.py  # Tag Genome 2021 + IMDb directors + MiniLM overview embeddings
+│   ├── evaluation.py        # NDCG/recall/coverage/Gini/fairness with bootstrap CIs
+│   ├── letterboxd_rss.py    # username → recent ratings via the public RSS feed
+│   ├── viz.py               # 3D UMAP renderer for the explore page
+│   └── api/                 # FastAPI app (main, schemas, routers, state)
+├── web/                     # SvelteKit + Tailwind frontend (served by nginx in prod)
+├── scripts/
+│   ├── train_svd.py / train_als.py            # train the underlying CF models
+│   ├── build_genome_features.py               # build the primary content scorer
+│   ├── build_movie_space_index.py             # 3D viz index
+│   ├── run_eval.py                            # phase 1/2 single-config eval
+│   └── run_eval_at_scale.py                   # phase 3: N≥200 users + bootstrap CIs
+├── models/                  # trained pickles (gitignored — built locally)
+├── ml-32m/                  # MovieLens 32M dataset (gitignored — download separately)
+├── data/                    # processed content features (gitignored)
+└── evaluation_results/      # JSON + markdown reports
 ```
 
-## Installation
+## Quick start — full stack via docker compose
 
-1. Clone the repository:
+The simplest way to run everything locally — FastAPI + SvelteKit + nginx, frontend proxying `/api/*` to the backend over the internal docker network:
+
 ```bash
-git clone <repository-url>
-cd letterboxdRecs
+VITE_TMDB_KEY=your_tmdb_v3_key docker compose up --build
+# open http://localhost:5173/
 ```
 
-2. Create a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+The `VITE_TMDB_KEY` is optional — without it, posters and streaming-availability badges silently degrade. Get one at https://www.themoviedb.org/settings/api.
 
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+What the stack expects on disk (read-only mounted into the api container):
+- `models/svd_full_slim.pkl` — Surprise SVD on ml-32m (`scripts/train_svd.py` then `scripts/slim_svd_pickle.py`)
+- `models/als_full.pkl` — implicit ALS on ml-32m (`scripts/train_als.py --ratings ml-32m/ratings.csv`)
+- `data/content_genome.{npz,json}` — Tag Genome 2021 (download `genome_2021.zip` from grouplens.org into `archives/`, unzip, then `scripts/build_genome_features.py`)
+- `ml-32m/` — the MovieLens 32M dataset
+- (optional) `data/movie_space_index.pkl` — 3D viz precomputed index (`scripts/build_movie_space_index.py`)
 
-4. Download MovieLens datasets:
-   - [MovieLens Latest Small](https://grouplens.org/datasets/movielens/latest/) → `ml-latest-small/`
-   - [MovieLens 32M](https://grouplens.org/datasets/movielens/32m/) → `ml-32m/`
-
-5. (Optional) Set up TMDB API for data enrichment:
-```bash
-export TMDB_API_KEY="your_api_key_here"
-```
-
-## Quick Start
-
-### 1. Train Models
-
-```python
-from src.data_processing import load_movielens_data
-from src.model_training import ModelTrainer
-
-# Load data
-data, ratings_df, movies_df, links_df = load_movielens_data(
-    "ml-latest-small/ratings.csv",
-    "ml-latest-small/movies.csv", 
-    "ml-latest-small/links.csv"
-)
-
-# Train models
-trainer = ModelTrainer(data)
-knn_results = trainer.train_knn_models()
-svd_results = trainer.train_svd_models()
-
-# Save models
-trainer.save_models()
-```
-
-### 2. Generate Recommendations
-
-```python
-from src.recommendations import RecommendationEngine, load_user_data_with_tmdb
-
-# Load your Letterboxd data
-user_ratings = load_user_data_with_tmdb(
-    "alex_data/ratings_with_tmdb.csv",
-    "ml-latest-small/links.csv"
-)
-
-# Generate recommendations
-engine = RecommendationEngine("models/svdpp.pkl")
-recommendations = engine.get_user_recommendations(
-    user_ratings, 
-    movies_df, 
-    top_n=10,
-    random_seed=42
-)
-
-for title, score in recommendations:
-    print(f"• {title} — {score}★")
-```
-
-### 3. Enrich Letterboxd Data
-
-```python
-from src.data_enrichment import enrich_letterboxd_csv
-
-# Add TMDB IDs to your Letterboxd export
-enrich_letterboxd_csv(
-    "alex_data/ratings.csv",
-    "alex_data/ratings_with_tmdb.csv",
-    sleep_between=0.1
-)
-```
-
-## Advanced Features
-
-### Hyperparameter Tuning
-
-```python
-# Train with hyperparameter optimization
-trainer = ModelTrainer(data)
-knn_results = trainer.train_knn_models(tune_hyperparams=True)
-```
-
-### Seeded Recommendations
-
-```python
-# Generate different recommendation sets with different seeds
-recs_1 = engine.get_user_recommendations(user_ratings, movies_df, random_seed=42)
-recs_2 = engine.get_user_recommendations(user_ratings, movies_df, random_seed=123)
-recs_3 = engine.get_user_recommendations(user_ratings, movies_df, random_seed=999)
-```
-
-### Cross-Validation
-
-```python
-# Evaluate model performance
-cv_results = trainer.cross_validate_models(cv=5)
-for model, metrics in cv_results.items():
-    print(f"{model}: RMSE = {metrics['rmse_mean']:.4f} ± {metrics['rmse_std']:.4f}")
-```
-
-## Datasets
-
-- **MovieLens**: Community ratings dataset with 100k+ users and 60k+ movies
-- **Letterboxd**: Personal movie ratings and watch history export
-- **TMDB**: Movie metadata and ID mapping service
-
-## Models
-
-- **KNNBasic**: Simple k-nearest neighbors collaborative filtering
-- **KNNWithMeans**: KNN with user/item mean normalization
-- **KNNBaseline**: KNN with baseline estimates
-- **SVD**: Singular Value Decomposition matrix factorization
-- **SVD++**: Enhanced SVD with implicit feedback
+See `.env.example` for tunable paths.
 
 ## REST API
 
-Phase 3 added a FastAPI backend. After training the models (`scripts/train_svd.py`, `scripts/train_als.py`) and building content features (`scripts/build_content_features.py`):
-
-```bash
-uvicorn src.api.main:app --reload --port 8000
-```
-
-OpenAPI docs at `http://localhost:8000/docs`. Endpoints:
+OpenAPI docs at `http://localhost:8000/docs`.
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | service + model-loaded status |
-| `GET /modes` | list of recommendation modes (`balanced`, `niche`, `popular`, `serendipitous`) with descriptions + weight breakdown |
-| `GET /strategies` | list of group strategies (`average`, `least_misery`, `most_pleasure`, `consensus`, `hybrid`, `group_taste_vector`) |
-| `POST /upload-letterboxd` | upload `ratings_with_tmdb.csv` (+ optional `watched_with_tmdb.csv`). Returns a SHA-256 content hash that doubles as a session id. |
-| `POST /recommend/individual` | `{hash, mode, top_n, exclude_rated?, exclude_watched?}` → top-N recs with per-rec explanations |
-| `POST /recommend/group` | `{hashes, member_names?, strategy, mode, top_n}` → group recs with per-member scores + fairness |
-| `POST /group/analyze` | `{hashes, member_names?}` → pairwise similarity (Pearson on shared ratings + cosine on TF-IDF taste vectors), consensus and disagreement films |
+| `GET /modes` | the five recommendation modes (`balanced`, `niche`, `popular`, `serendipitous`, `calibrated`) with weight breakdown |
+| `GET /strategies` | the six group strategies including `group_taste_vector` |
+| `POST /upload-letterboxd` | upload `ratings.csv` (+ optional `watched.csv`, `watchlist.csv`). Returns a SHA-256 content hash that doubles as a session id. |
+| `POST /upload-letterboxd-username` | RSS-based ingest: `{username}` → the most-recent ~50 ratings, TMDB IDs included inline |
+| `POST /recommend/individual` | `{hash, mode, top_n}` → top-N with per-rec breakdown |
+| `POST /recommend/group` | `{hashes, member_names?, strategy, mode, top_n, exclude_seen_by_any?}` — `exclude_seen_by_any` powers the strict "Nobody's seen" tab |
+| `POST /recommend/group/disagreement` | high-variance picks where members disagree |
+| `POST /group/analyze` | pairwise compatibility report + threshold-gated consensus / disagreement lists |
+| `POST /group/watchlist-overlap` | films multiple members already want to see |
+| `POST /group` | create a shareable group → returns `group_id` |
+| `POST /group/demo` | seed a shareable group with 3 cached demo users so first-time visitors can see the experience |
+| `POST /group/{id}/join` | add a member (existing upload hash + display name) |
+| `POST /group/{id}/vote` | cast `up` / `veto` / `clear` on a film |
+| `GET  /group/{id}` | fetch current group state (members + votes) |
+| `GET  /explore/background` | catalog coordinates for the 3D viz |
+| `GET  /explore/personalized?hash=…` | personalized 3D HTML for a specific upload |
 
 Caching is content-addressable — re-uploading the same export hits the same diskcache entry, no session lifecycle.
 
-### Full stack via docker compose
+## Modes + strategies
 
-The fastest way to run everything locally — FastAPI + SvelteKit + nginx, with the frontend proxying `/api/*` to the backend over the internal docker network:
+**Individual rec modes** (verified at scale across N=200 users, 95% bootstrap CIs — see `evaluation_results/phase3_at_scale_v2.md`):
+
+| mode | NDCG@10 | Catalog coverage | Gini | When to use |
+|---|---|---|---|---|
+| `popular` | 0.27 | 0.019 | 0.49 | Wins NDCG by recycling the same ~1.7k canon films across all users |
+| `balanced` | 0.16 | 0.035 | 0.81 | Default. ~2x coverage of `popular`, sane mid-popularity floor |
+| `serendipitous` | 0.15 | 0.035 | 0.81 | Heaviest diversity weight, slightly wider net |
+| `calibrated` | 0.13 | 0.035 | 0.78 | Steck-style: matches the user's historical genre distribution. Trades top-K precision for breadth |
+| `niche` | 0.025 | 0.037 | 0.91 | Aggressive popularity penalty — hidden gems, poor NDCG by design |
+
+`popular` winning NDCG@10 is partly an artifact of catalog concentration: bootstrap CIs on `catalog_coverage_at_50` show it surfaces ~half as many unique films as the other modes.
+
+**Group aggregation strategies** (NDCG and fairness CV across N=50 groups, balanced mode):
+
+| strategy | NDCG | Fairness CV | Notes |
+|---|---|---|---|
+| `most_pleasure` | 0.077 | 0.89 (worst) | Highest NDCG, but actively hurts the unhappy member |
+| `average` | 0.062 | 0.54 | Principled middle |
+| `hybrid` | 0.057 | 0.52 | Average + worst-score bonus |
+| `group_taste_vector` | 0.041 | 0.80 | The interesting one: latent-space fusion (max-merge ratings → single ALS fold-in). Lower NDCG but distinct picks no member would rank top-K individually. |
+| `least_misery` | 0.007 | 0.23 (best) | Broken at scale — the require-all-members filter is too aggressive |
+
+The `group_taste_vector` strategy is the genuinely uncommon move in this codebase: academic group-recsys literature (Masthoff, Felfernig, Kaya & Bridge, Serbos) focuses on aggregating *scores* after each member's individual recs are computed. Fusing in latent space *before* fold-in can surface films no individual member would rank top-K.
+
+## Eval harness
+
+Per-call evaluation (`scripts/run_eval.py`): ranking quality on holdout, no CIs.
+
+At-scale evaluation (`scripts/run_eval_at_scale.py`): streams ml-32m, samples N users + M groups, runs 1000 bootstrap resamples for percentile CIs on NDCG/Recall/intra-list-diversity/fairness-CV, plus list-aggregated CIs on catalog coverage + Gini-popularity.
 
 ```bash
-docker compose up --build
-# then open http://localhost:5173/
+# the full at-scale run (~20 min on ml-32m via docker exec)
+docker exec letterboxd-recs-api python scripts/run_eval_at_scale.py \
+  --n-users 200 --n-groups 50 \
+  --modes balanced,niche,popular,serendipitous,calibrated \
+  --strategies average,least_misery,most_pleasure,hybrid,group_taste_vector \
+  --bootstrap-n 1000 \
+  --output evaluation_results/phase3_at_scale_v2.json \
+  --report evaluation_results/phase3_at_scale_v2.md
 ```
 
-What the stack expects on disk (read-only mounted into the api container):
-- `models/svd_full_slim.pkl` — Surprise SVD on ml-32m (run `scripts/train_svd.py` then `scripts/slim_svd_pickle.py`)
-- `models/als_full.pkl` — implicit ALS on ml-32m (run `scripts/train_als.py --ratings ml-32m/ratings.csv`)
-- `data/content_genome.{npz,json}` — Tag Genome 2021 content features (download `genome_2021.zip` from grouplens.org into `archives/`, unzip, then `scripts/build_genome_features.py`)
-- `ml-32m/` — the MovieLens 32M dataset
-
-Optional TMDB poster fetching in the UI: set `VITE_TMDB_KEY` before `docker compose build` to bake a read-only TMDB API key into the SvelteKit bundle. Without it the cards show a placeholder.
-
-See `.env.example` for tunable paths (`MODELS_DIR`, `ML_DATA_DIR`, `CONTENT_FEATURES`, `CACHE_DIR`, `SVD_FILE`, `ALS_FILE`).
-
-### Backend only
-
-```bash
-docker build -t letterboxd-recs-api .
-docker run -p 8000:8000 \
-  -v $(pwd)/models:/app/models \
-  -v $(pwd)/ml-32m:/app/ml-32m \
-  -v $(pwd)/data:/app/data \
-  letterboxd-recs-api
-```
-
-Or natively for development:
-
-```bash
-uvicorn src.api.main:app --reload --port 8000
-```
+Reports land in `evaluation_results/phase3_at_scale_v2.md`.
 
 ## Library API
 
-See the individual module docstrings for detailed API documentation:
-- `src.data_processing`: Data loading and preprocessing utilities
-- `src.model_training`: Model training and evaluation
-- `src.recommendations`: Recommendation generation engine
-- `src.data_enrichment`: TMDB integration and data enrichment
-- `src.reranking`: Phase 1 candidate-gen → re-rank pipeline (`Reranker` is the new public surface)
-- `src.group_reranker`: Group recommendations across 6 strategies
-- `src.content_features`: Content scorer — Tag Genome 2021 by default, TF-IDF fallback (Phase 2 / 2.5)
-- `src.evaluation`: Offline eval harness (NDCG@k, recall@k, coverage, Gini, intra-list diversity, group fairness)
-- `src.api`: FastAPI app + state singleton + routers (Phase 3)
-- `web/`: SvelteKit frontend (Phase 4)
+- `src.reranking` — `Reranker` (hybrid CF + content + diversity), `ALSScorer`, `SVDScorer`, `MODE_WEIGHTS`
+- `src.group_reranker` — `GroupReranker` with 6 strategies, including the latent-space `group_taste_vector`
+- `src.content_features` — Tag Genome 2021 + IMDb directors + sentence-transformer overview embeddings, weight-averaged
+- `src.evaluation` — NDCG/Recall/intra-list-diversity/fairness-CV with bootstrap CIs + list-aggregated catalog coverage + Gini
+- `src.letterboxd_rss` — username → recent rated films via the public RSS feed (HTML is Cloudflare-gated)
+- `src.viz` — 3D UMAP renderer for the explore page
+- `src.api` — FastAPI app + state singleton + routers (recommendations, groups, explore, meta)
+- `web/` — SvelteKit frontend, Tailwind, vanilla DM Serif Display for headers / Inter for body
 
-## Visualization
+## Datasets + credits
 
-`scripts/build_movie_space_viz.py` writes `evaluation_results/movie_space_alex.html` — a 3D UMAP projection of the ALS latent space with the user's rated films highlighted and their folded-in taste vector plotted in the same space. Useful for spot-checking why the recommender clusters things the way it does.
+- **MovieLens 32M** — community ratings (200,948 users × 84,432 items). Required.
+- **Tag Genome 2021** — 1,084 curated content tags × 9,734 films. Required.
+- **TMDB** — posters, streaming-availability, and overview embeddings via their public API. Optional but recommended. *This product uses the TMDB API but is not endorsed or certified by TMDB.*
+- **Letterboxd** — personal ratings + watchlist via the public RSS feed or CSV export.
+- **IMDb bulk dumps** — director one-hots for the content scorer. Optional.
 
-## TODO
+## Status
 
-- ✅ **Organize!** — modular `src/` layout
-- ✅ Group-prediction capabilities for both SVD and KNN methods — `GroupReranker` with 6 strategies including `group_taste_vector`
-- ✅ Train/valid/test split + overfitting detection — `src.model_training.EnhancedModelTrainer`
-- ✅ Train on large dataset — SVD + ALS now on ml-32m (200,948 users × 84,432 items)
-- ✅ Create Svelte web app — SvelteKit in `web/`, deployed via docker compose
-
-Queued upgrades (see `evaluation_results/phase0_findings.md` and the subagent research):
-- Sentence-transformer embeddings on TMDB overview text as a second content scorer
-- Director-id features from IMDb bulk dumps (cinephile-critical signal)
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+- ✅ Modular `src/` layout, train/val/test splits with overfitting detection
+- ✅ Hybrid candidate generation (SVD + ALS fold-in) → re-rank pipeline with 5 modes
+- ✅ Group recommendations: 6 strategies (5 traditional + `group_taste_vector` latent-space fusion)
+- ✅ Tag Genome + IMDb directors + MiniLM TMDB-overview embeddings as content scorers (weighted)
+- ✅ Calibrated diversity (Steck 2018) as an opt-in mode — eval-validated but not the default
+- ✅ FastAPI backend + SvelteKit frontend (docker compose)
+- ✅ Shareable groups with QR-code join, real-time voting, watchlist overlap
+- ✅ At-scale eval harness with bootstrap CIs + catalog coverage + Gini popularity
+- ⏳ External-baseline comparison (vs. SLIM / popularity-only / Sam Learner's letterboxd-recommendations)
+- ⏳ Second dataset replication (Amazon Movies or anime)
+- ⏳ Per-user-cluster eval (cinephile vs mainstream NDCG breakdown)
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT.

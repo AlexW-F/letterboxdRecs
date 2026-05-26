@@ -97,6 +97,19 @@ body {
 	color: transparent;
 }
 
+/* Per-line scrim that hugs the text — uses box-decoration-break so
+   a wrapped paragraph gets a separate background strip per line
+   instead of one big rectangle. */
+.text-scrim {
+	background: rgba(10, 12, 16, 0.55);
+	padding: 0.1em 0.4em;
+	border-radius: 0.35em;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+	backdrop-filter: blur(8px) saturate(135%);
+	-webkit-backdrop-filter: blur(8px) saturate(135%);
+}
+
 /* ----------------------------------------------------------------------
    Surfaces / cards
    ---------------------------------------------------------------------- */

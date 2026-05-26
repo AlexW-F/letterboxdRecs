@@ -20,6 +20,9 @@ from ..schemas import (
     IndividualRecResponse,
     PairwiseSimilarity,
     RecOut,
+    WatchlistOverlapItem,
+    WatchlistOverlapRequest,
+    WatchlistOverlapResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -114,6 +117,31 @@ def _resolve_members(state, hashes: List[str], names: Optional[List[str]]):
     return member_names, members
 
 
+def _group_recs_to_response(
+    names: List[str],
+    strategy: str,
+    mode: str,
+    recs,
+) -> GroupRecResponse:
+    return GroupRecResponse(
+        member_names=names,
+        strategy=strategy,
+        mode=mode,
+        recommendations=[
+            GroupRecOut(
+                movie_id=str(c.movie_id),
+                title=str(c.title),
+                score=float(c.score),
+                per_member_score={k: float(v) for k, v in c.per_member_score.items()},
+                fairness=float(c.fairness),
+                explanation=_explanation_to_out(c.explanation),
+                breakdown=({k: float(v) for k, v in c.breakdown.items()} if c.breakdown else None),
+            )
+            for c in recs
+        ],
+    )
+
+
 @router.post("/recommend/group", response_model=GroupRecResponse)
 def recommend_group(req: GroupRecRequest, request: Request) -> GroupRecResponse:
     state = _state(request)
@@ -130,23 +158,29 @@ def recommend_group(req: GroupRecRequest, request: Request) -> GroupRecResponse:
         top_n=req.top_n,
         exclude_rated=req.exclude_rated,
         exclude_watched=req.exclude_watched,
+        exclude_seen_by_any=req.exclude_seen_by_any,
     )
-    return GroupRecResponse(
-        member_names=names,
-        strategy=req.strategy,
+    return _group_recs_to_response(names, req.strategy, req.mode, recs)
+
+
+@router.post("/recommend/group/disagreement", response_model=GroupRecResponse)
+def recommend_group_disagreement(req: GroupRecRequest, request: Request) -> GroupRecResponse:
+    """High-variance group picks — surfaces films one member loves and another
+    would skip. Same request shape as /recommend/group; the ``strategy`` field
+    is ignored (disagreement has its own sort)."""
+    state = _state(request)
+    if req.mode not in state.reranker_modes_set:
+        raise HTTPException(status_code=400, detail=f"unknown mode {req.mode!r}")
+    names, members = _resolve_members(state, req.hashes, req.member_names)
+
+    recs = state.group_reranker.recommend_disagreement(
+        members=members,
         mode=req.mode,
-        recommendations=[
-            GroupRecOut(
-                movie_id=str(c.movie_id),
-                title=str(c.title),
-                score=float(c.score),
-                per_member_score={k: float(v) for k, v in c.per_member_score.items()},
-                fairness=float(c.fairness),
-                explanation=_explanation_to_out(c.explanation),
-            )
-            for c in recs
-        ],
+        top_n=req.top_n,
+        exclude_rated=req.exclude_rated,
+        exclude_watched=req.exclude_watched,
     )
+    return _group_recs_to_response(names, "disagreement", req.mode, recs)
 
 
 # ---------------------------------------------------------------------------
@@ -209,14 +243,89 @@ def analyze_group(req: GroupAnalyzeRequest, request: Request) -> GroupAnalyzeRes
             "std": float(np.std(rs)),
         })
 
-    # Consensus = high mean, low std; sort by mean - std, take top N.
-    consensus = sorted(rows, key=lambda r: r["mean"] - r["std"], reverse=True)[: req.top_overlap]
-    # Disagreement = high std, sort desc.
-    disagreement = sorted(rows, key=lambda r: r["std"], reverse=True)[: req.top_overlap]
+    # Two meaningful categories with hard thresholds so the lists actually
+    # mean what they say (vs. the old behavior where a tightly-rated group
+    # got the same films in both lists, just re-sorted).
+    #
+    # - Consensus = "universally liked": positive mean (>=3.5) AND tight
+    #   agreement (std <= 0.75 stars on the 0.5–5.0 Letterboxd scale).
+    # - Disagreement = "you'd argue about this": real divergence
+    #   (std >= 1.0 stars). Items in the consensus set are excluded so the
+    #   two surfaces are disjoint.
+    CONSENSUS_MIN_MEAN = 3.5
+    CONSENSUS_MAX_STD = 0.75
+    DISAGREEMENT_MIN_STD = 1.0
+
+    consensus_pool = [r for r in rows
+                      if r["mean"] >= CONSENSUS_MIN_MEAN and r["std"] <= CONSENSUS_MAX_STD]
+    consensus = sorted(consensus_pool, key=lambda r: r["mean"] - r["std"], reverse=True)[: req.top_overlap]
+
+    consensus_ids = {r["movie_id"] for r in consensus}
+    disagreement_pool = [r for r in rows
+                         if r["std"] >= DISAGREEMENT_MIN_STD and r["movie_id"] not in consensus_ids]
+    disagreement = sorted(disagreement_pool, key=lambda r: r["std"], reverse=True)[: req.top_overlap]
 
     return GroupAnalyzeResponse(
         member_names=names,
         pairwise=pairwise,
         consensus_movies=consensus,
         disagreement_movies=disagreement,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Group watchlist overlap — films multiple members want to see
+# ---------------------------------------------------------------------------
+
+
+@router.post("/group/watchlist-overlap", response_model=WatchlistOverlapResponse)
+def group_watchlist_overlap(
+    req: WatchlistOverlapRequest, request: Request,
+) -> WatchlistOverlapResponse:
+    """Films appearing on >= ``min_members`` members' watchlists. No CF needed —
+    a conscious "want to watch" signal from each friend is a strong direct
+    group recommendation on its own."""
+    state = _state(request)
+    if req.member_names is not None and len(req.member_names) != len(req.hashes):
+        raise HTTPException(status_code=400,
+                            detail="member_names length must match hashes")
+    names = (
+        list(req.member_names) if req.member_names
+        else [f"member_{i+1}" for i in range(len(req.hashes))]
+    )
+
+    # Build per-member watchlist sets; track who actually uploaded one.
+    per_member: List[set] = []
+    n_with_watchlist = 0
+    for h in req.hashes:
+        if h not in state.cache:
+            raise HTTPException(status_code=404, detail=f"unknown hash {h!r}")
+        entry = state.cache[h]
+        wl = set(entry.get("watchlist_movie_ids") or [])
+        if wl:
+            n_with_watchlist += 1
+        per_member.append(wl)
+
+    # Tally per-movie occurrence across members.
+    movie_to_members: Dict[str, List[str]] = {}
+    for name, wl in zip(names, per_member):
+        for mid in wl:
+            movie_to_members.setdefault(str(mid), []).append(name)
+
+    items: List[WatchlistOverlapItem] = []
+    for mid, member_list in movie_to_members.items():
+        if len(member_list) < req.min_members:
+            continue
+        items.append(WatchlistOverlapItem(
+            movie_id=mid,
+            title=state.title_of.get(mid, mid),
+            members=member_list,
+            count=len(member_list),
+        ))
+    # Most-shared first; ties broken alphabetically by title for determinism.
+    items.sort(key=lambda it: (-it.count, it.title.lower()))
+    return WatchlistOverlapResponse(
+        member_names=names,
+        n_with_watchlist=n_with_watchlist,
+        items=items[: req.top_n],
     )

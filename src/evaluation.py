@@ -335,6 +335,186 @@ def evaluate_group(
 # Helpers for loading the catalog signals used by the metrics
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Per-unit evaluation (returns raw lists for bootstrap CIs)
+# ---------------------------------------------------------------------------
+
+
+def evaluate_individual_per_user(
+    recommender_fn: RecommenderFn,
+    users: Dict[str, Dict[str, float]],
+    *,
+    item_features: Dict[str, Set[str]],
+    holdout_frac: float = 0.2,
+    top_n: int = 50,
+    seed: int = 42,
+) -> Tuple[Dict[str, List[float]], List[List[str]]]:
+    """Same evaluation as ``evaluate_individual`` but returns per-user metric
+    arrays instead of aggregate means — feed to ``bootstrap_ci`` for CIs.
+
+    Also returns the per-user top-50 rec lists so the caller can compute
+    list-aggregated metrics (catalog coverage, Gini popularity) and bootstrap
+    them by resampling users.
+    """
+    out: Dict[str, List[float]] = {
+        "ndcg_at_10": [], "ndcg_at_50": [],
+        "recall_at_10": [], "recall_at_50": [],
+        "intra_list_diversity_at_10": [],
+    }
+    per_user_top_lists: List[List[str]] = []
+    for user_idx, (_label, ratings) in enumerate(users.items()):
+        train, holdout = holdout_split(ratings, holdout_frac=holdout_frac, seed=seed + user_idx)
+        if not holdout:
+            continue
+        try:
+            ranked = recommender_fn(train, top_n)
+        except Exception:
+            continue
+        ranked_ids = [str(mid) for mid, _ in ranked]
+        relevance = {str(k): float(v) for k, v in holdout.items()}
+        relevant_set = {k for k, v in relevance.items() if v >= 3.5}
+        out["ndcg_at_10"].append(ndcg_at_k(ranked_ids, relevance, 10))
+        out["ndcg_at_50"].append(ndcg_at_k(ranked_ids, relevance, 50))
+        out["recall_at_10"].append(recall_at_k(ranked_ids, relevant_set, 10))
+        out["recall_at_50"].append(recall_at_k(ranked_ids, relevant_set, 50))
+        out["intra_list_diversity_at_10"].append(
+            intra_list_diversity(ranked_ids, item_features, k=10)
+        )
+        per_user_top_lists.append(ranked_ids[:50])
+    return out, per_user_top_lists
+
+
+def evaluate_group_per_group(
+    group_recommender_fn: GroupRecommenderFn,
+    groups: List[List[Dict[str, float]]],
+    *,
+    item_features: Dict[str, Set[str]],
+    holdout_frac: float = 0.2,
+    top_n: int = 50,
+    seed: int = 42,
+) -> Tuple[Dict[str, List[float]], List[List[str]]]:
+    """Per-group metric arrays for bootstrap CIs.
+
+    For each synthetic group: hold out each member's ratings, run the group
+    rec on the train portions, score each member's NDCG@10 against their
+    holdout, return per-group averages + fairness CV across members.
+
+    Also returns per-group top-50 lists so the caller can compute catalog
+    coverage / Gini-popularity across the strategy's recommended pool.
+    """
+    out: Dict[str, List[float]] = {
+        "avg_per_member_ndcg_at_10": [],
+        "avg_per_member_recall_at_50": [],
+        "fairness_cv_at_10": [],
+        "intra_list_diversity_at_10": [],
+    }
+    per_group_top_lists: List[List[str]] = []
+    for grp_idx, members in enumerate(groups):
+        trains: List[Dict[str, float]] = []
+        holdouts: List[Dict[str, float]] = []
+        for i, ratings in enumerate(members):
+            train, h = holdout_split(ratings, holdout_frac=holdout_frac, seed=seed + grp_idx * 100 + i)
+            trains.append(train)
+            holdouts.append(h)
+        try:
+            ranked = group_recommender_fn(trains, top_n)
+        except Exception:
+            continue
+        ranked_ids = [str(mid) for mid, _ in ranked]
+        per_member_ndcg10: List[float] = []
+        per_member_recall50: List[float] = []
+        for h in holdouts:
+            if not h:
+                continue
+            relevance = {str(k): float(v) for k, v in h.items()}
+            relevant_set = {k for k, v in relevance.items() if v >= 3.5}
+            per_member_ndcg10.append(ndcg_at_k(ranked_ids, relevance, 10))
+            per_member_recall50.append(recall_at_k(ranked_ids, relevant_set, 50))
+        if not per_member_ndcg10:
+            continue
+        mean = float(np.mean(per_member_ndcg10))
+        std = float(np.std(per_member_ndcg10))
+        out["avg_per_member_ndcg_at_10"].append(mean)
+        out["avg_per_member_recall_at_50"].append(
+            float(np.mean(per_member_recall50)) if per_member_recall50 else 0.0
+        )
+        out["fairness_cv_at_10"].append(std / mean if mean > 0 else 0.0)
+        out["intra_list_diversity_at_10"].append(
+            intra_list_diversity(ranked_ids, item_features, k=10)
+        )
+        per_group_top_lists.append(ranked_ids[:50])
+    return out, per_group_top_lists
+
+
+# ---------------------------------------------------------------------------
+# Bootstrap CI
+# ---------------------------------------------------------------------------
+
+
+def bootstrap_set_metric(
+    per_unit_lists: List[List[str]],
+    metric_fn: Callable[[List[List[str]]], float],
+    *,
+    n_resamples: int = 1000,
+    confidence: float = 0.95,
+    seed: int = 42,
+) -> Dict[str, float]:
+    """Bootstrap CI for a list-aggregated metric (catalog coverage, Gini).
+
+    The metric is a function ``f(list_of_rec_lists) -> float`` — i.e. it needs
+    the full collection of users'/groups' top-N lists to compute. We resample
+    the *unit* (one rec list per user/group) with replacement.
+    """
+    n = len(per_unit_lists)
+    if n == 0:
+        return {"point": 0.0, "lower": 0.0, "upper": 0.0, "n": 0}
+    point = float(metric_fn(per_unit_lists))
+    if n < 2:
+        return {"point": point, "lower": point, "upper": point, "n": n}
+    rng = np.random.default_rng(seed)
+    samples = np.empty(n_resamples, dtype=np.float64)
+    for i in range(n_resamples):
+        idx = rng.integers(0, n, size=n)
+        resampled = [per_unit_lists[j] for j in idx]
+        samples[i] = metric_fn(resampled)
+    alpha = (1.0 - confidence) / 2.0
+    return {
+        "point": point,
+        "lower": float(np.percentile(samples, alpha * 100)),
+        "upper": float(np.percentile(samples, (1 - alpha) * 100)),
+        "n": n,
+    }
+
+
+def bootstrap_ci(
+    values: Sequence[float],
+    *,
+    n_resamples: int = 1000,
+    confidence: float = 0.95,
+    seed: int = 42,
+) -> Dict[str, float]:
+    """Percentile bootstrap CI for the mean of ``values``.
+
+    Returns ``{"mean", "lower", "upper", "n"}``. If ``len(values) < 2``,
+    returns the mean with the same value for lower/upper (no CI computable).
+    """
+    if not values:
+        return {"mean": 0.0, "lower": 0.0, "upper": 0.0, "n": 0}
+    arr = np.asarray(values, dtype=np.float64)
+    n = len(arr)
+    if n < 2:
+        v = float(arr[0])
+        return {"mean": v, "lower": v, "upper": v, "n": n}
+    rng = np.random.default_rng(seed)
+    # Vectorized: one (n_resamples, n) sample-matrix; mean along axis=1.
+    idx = rng.integers(0, n, size=(n_resamples, n))
+    sampled_means = arr[idx].mean(axis=1)
+    alpha = (1.0 - confidence) / 2.0
+    lower = float(np.percentile(sampled_means, alpha * 100))
+    upper = float(np.percentile(sampled_means, (1 - alpha) * 100))
+    return {"mean": float(arr.mean()), "lower": lower, "upper": upper, "n": n}
+
+
 def build_item_popularity(ratings_df: pd.DataFrame, movie_col: str = "movieId") -> Dict[str, int]:
     counts = ratings_df[movie_col].astype(str).value_counts().to_dict()
     return {str(k): int(v) for k, v in counts.items()}

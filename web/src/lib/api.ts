@@ -28,6 +28,7 @@ export interface GroupRec {
 	per_member_score: Record<string, number>;
 	fairness: number;
 	explanation?: Explanation;
+	breakdown?: Record<string, number>;
 }
 
 export interface UploadResult {
@@ -35,6 +36,22 @@ export interface UploadResult {
 	n_ratings_in: number;
 	n_ratings_mapped: number;
 	n_with_tmdb: number;
+	n_watchlist: number;
+	source?: 'csv' | 'letterboxd_rss';
+	letterboxd_username?: string | null;
+}
+
+export interface WatchlistOverlapItem {
+	movie_id: string;
+	title: string;
+	members: string[];
+	count: number;
+}
+
+export interface WatchlistOverlapResponse {
+	member_names: string[];
+	n_with_watchlist: number;
+	items: WatchlistOverlapItem[];
 }
 
 export interface Mode {
@@ -134,14 +151,97 @@ export async function getStrategies(): Promise<{ strategies: Strategy[] }> {
 
 export async function uploadLetterboxd(
 	ratings: File,
-	watched?: File | null
+	watched?: File | null,
+	watchlist?: File | null
 ): Promise<UploadResult> {
 	const fd = new FormData();
 	fd.append('ratings', ratings);
 	if (watched) fd.append('watched', watched);
+	if (watchlist) fd.append('watchlist', watchlist);
 	const r = await fetch(`${API_BASE}/upload-letterboxd`, { method: 'POST', body: fd });
 	if (!r.ok) throw new Error(`upload ${r.status}: ${await r.text()}`);
 	return r.json() as Promise<UploadResult>;
+}
+
+// --- Shared groups (multi-device join link + voting) --------------------
+
+export interface GroupMember {
+	name: string;
+	hash: string;
+	n_ratings_mapped: number;
+	n_watchlist: number;
+	source: string;
+	letterboxd_username?: string | null;
+	joined_at: number;
+}
+
+export interface GroupState {
+	group_id: string;
+	created_at: number;
+	members: GroupMember[];
+	votes: Record<string, Record<string, 'up' | 'veto'>>;
+}
+
+export async function createGroup(name?: string): Promise<GroupState> {
+	return jsonPost<GroupState>('/group', { name: name ?? null });
+}
+
+export async function createDemoGroup(): Promise<GroupState> {
+	return jsonPost<GroupState>('/group/demo', {});
+}
+
+export async function getGroup(groupId: string): Promise<GroupState> {
+	return jsonGet<GroupState>(`/group/${encodeURIComponent(groupId)}`);
+}
+
+export async function joinGroup(
+	groupId: string,
+	body: { name: string; hash: string }
+): Promise<GroupState> {
+	return jsonPost<GroupState>(`/group/${encodeURIComponent(groupId)}/join`, body);
+}
+
+export async function leaveGroup(groupId: string, memberName: string): Promise<GroupState> {
+	return jsonPost<GroupState>(
+		`/group/${encodeURIComponent(groupId)}/leave/${encodeURIComponent(memberName)}`,
+		{}
+	);
+}
+
+export async function castGroupVote(
+	groupId: string,
+	body: { member_name: string; movie_id: string; vote: 'up' | 'veto' | 'clear' }
+): Promise<GroupState> {
+	return jsonPost<GroupState>(`/group/${encodeURIComponent(groupId)}/vote`, body);
+}
+
+export async function uploadLetterboxdUsername(username: string): Promise<UploadResult> {
+	const r = await fetch(`${API_BASE}/upload-letterboxd-username`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ username })
+	});
+	if (!r.ok) {
+		// Backend returns {detail: "..."} for HTTPException; surface that string.
+		let msg = `${r.status}`;
+		try {
+			const body = await r.json();
+			msg = body.detail || msg;
+		} catch {
+			msg = await r.text();
+		}
+		throw new Error(msg);
+	}
+	return r.json() as Promise<UploadResult>;
+}
+
+export async function groupWatchlistOverlap(req: {
+	hashes: string[];
+	member_names?: string[];
+	min_members?: number;
+	top_n?: number;
+}): Promise<WatchlistOverlapResponse> {
+	return jsonPost<WatchlistOverlapResponse>('/group/watchlist-overlap', req);
 }
 
 export interface IndividualRecRequest {
@@ -174,6 +274,7 @@ export interface GroupRecRequest {
 	top_n: number;
 	exclude_rated?: boolean;
 	exclude_watched?: boolean;
+	exclude_seen_by_any?: boolean;
 }
 
 export interface GroupRecResponse {
@@ -187,6 +288,12 @@ export async function recommendGroup(req: GroupRecRequest): Promise<GroupRecResp
 	return jsonPost<GroupRecResponse>('/recommend/group', req);
 }
 
+export async function recommendGroupDisagreement(
+	req: GroupRecRequest
+): Promise<GroupRecResponse> {
+	return jsonPost<GroupRecResponse>('/recommend/group/disagreement', req);
+}
+
 export async function analyzeGroup(req: {
 	hashes: string[];
 	member_names?: string[];
@@ -195,19 +302,39 @@ export async function analyzeGroup(req: {
 	return jsonPost<GroupAnalysis>('/group/analyze', req);
 }
 
-// --- TMDB poster URL helper -----------------------------------------------
+// --- TMDB poster + watch-provider helpers --------------------------------
 //
-// The backend doesn't ship posters (they'd just be a wasted hop). The
-// browser hits TMDB directly with a read-only API key. If VITE_TMDB_KEY is
-// not set, we fall back to a generated placeholder so the UI still works
-// at all.
+// The backend doesn't ship posters or streaming info (a wasted hop — the
+// browser can hit TMDB directly with a read-only API key). If
+// VITE_TMDB_KEY is not set, helpers return null/empty and the UI degrades.
 
-const TMDB_LOOKUP_CACHE = new Map<string, Promise<string | null>>();
+export interface StreamingProvider {
+	name: string;
+	logoUrl: string;
+	priority: number;
+}
+
+export interface MovieMeta {
+	tmdbId: number | null;
+	posterUrl: string | null;
+	providers: StreamingProvider[]; // subscription/flatrate only — what you can stream without paying again
+}
+
+const META_CACHE = new Map<string, Promise<MovieMeta>>();
+const EMPTY_META: MovieMeta = { tmdbId: null, posterUrl: null, providers: [] };
+
+function tmdbKey(): string {
+	if (typeof window !== 'undefined') {
+		const override = (window as { LBRECS_TMDB?: string }).LBRECS_TMDB;
+		if (override) return override;
+	}
+	return TMDB_KEY;
+}
 
 export function tmdbSearchURL(title: string, year?: number): string {
 	const q = encodeURIComponent(title.replace(/\s*\((19|20)\d{2}\)\s*$/, '').trim());
 	const yearParam = year ? `&primary_release_year=${year}` : '';
-	return `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${q}${yearParam}&include_adult=false`;
+	return `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey()}&query=${q}${yearParam}&include_adult=false`;
 }
 
 export function extractYear(title: string): number | undefined {
@@ -216,22 +343,70 @@ export function extractYear(title: string): number | undefined {
 	return parseInt(m[1] + m[2], 10);
 }
 
-export async function tmdbPosterURL(title: string): Promise<string | null> {
-	if (!TMDB_KEY) return null;
-	if (TMDB_LOOKUP_CACHE.has(title)) return TMDB_LOOKUP_CACHE.get(title)!;
-	const year = extractYear(title);
-	const lookup = (async () => {
+// Region defaults to US; flip via localStorage('lbrecs_region') if needed.
+function watchRegion(): string {
+	if (typeof window === 'undefined') return 'US';
+	return (window.localStorage?.getItem('lbrecs_region') || 'US').toUpperCase();
+}
+
+export async function tmdbMovieMeta(title: string): Promise<MovieMeta> {
+	if (META_CACHE.has(title)) return META_CACHE.get(title)!;
+
+	const lookup = (async (): Promise<MovieMeta> => {
+		const key = tmdbKey();
+		if (!key) return EMPTY_META;
 		try {
-			const r = await fetch(tmdbSearchURL(title, year));
-			if (!r.ok) return null;
-			const data: { results: { poster_path: string | null }[] } = await r.json();
-			if (!data.results?.length) return null;
-			const poster = data.results[0]?.poster_path;
-			return poster ? `https://image.tmdb.org/t/p/w342${poster}` : null;
+			const year = extractYear(title);
+			const searchRes = await fetch(tmdbSearchURL(title, year));
+			if (!searchRes.ok) return EMPTY_META;
+			const searchData: { results: { id: number; poster_path: string | null }[] } =
+				await searchRes.json();
+			const hit = searchData.results?.[0];
+			if (!hit) return EMPTY_META;
+			const posterUrl = hit.poster_path ? `https://image.tmdb.org/t/p/w342${hit.poster_path}` : null;
+
+			// Watch-providers is a second call but TMDB's free tier handles it.
+			let providers: StreamingProvider[] = [];
+			try {
+				const provRes = await fetch(
+					`https://api.themoviedb.org/3/movie/${hit.id}/watch/providers?api_key=${tmdbKey()}`
+				);
+				if (provRes.ok) {
+					const provData: {
+						results: Record<
+							string,
+							{
+								flatrate?: { provider_name: string; logo_path: string; display_priority: number }[];
+							}
+						>;
+					} = await provRes.json();
+					const region = watchRegion();
+					const flat = provData.results?.[region]?.flatrate ?? [];
+					providers = flat
+						.slice()
+						.sort((a, b) => a.display_priority - b.display_priority)
+						.map((p) => ({
+							name: p.provider_name,
+							logoUrl: `https://image.tmdb.org/t/p/w45${p.logo_path}`,
+							priority: p.display_priority
+						}));
+				}
+			} catch {
+				// Provider lookup is best-effort
+			}
+
+			return { tmdbId: hit.id, posterUrl, providers };
 		} catch {
-			return null;
+			return EMPTY_META;
 		}
 	})();
-	TMDB_LOOKUP_CACHE.set(title, lookup);
+	META_CACHE.set(title, lookup);
 	return lookup;
+}
+
+// Back-compat shim so other pages (explore, etc.) that just want the poster
+// keep working unchanged.
+export async function tmdbPosterURL(title: string): Promise<string | null> {
+	const meta = await tmdbMovieMeta(title);
+	return meta.posterUrl;
 }

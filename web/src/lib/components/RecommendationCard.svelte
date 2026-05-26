@@ -1,33 +1,81 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
-	import { ChevronDown, Star, Sparkles } from 'lucide-svelte';
+	import { ChevronDown, Star, Sparkles, ThumbsUp, Ban } from 'lucide-svelte';
 	import Avatar from './Avatar.svelte';
-	import type { Explanation } from '$lib/api';
-	import { tmdbPosterURL } from '$lib/api';
+	import type { Explanation, StreamingProvider } from '$lib/api';
+	import { tmdbMovieMeta } from '$lib/api';
 
 	let {
 		rank = 0,
+		movieId = undefined,
 		title,
 		score,
 		explanation = undefined,
 		per_member_score = undefined,
 		fairness = undefined,
-		memberOrder = []
+		memberOrder = [],
+		breakdown = undefined,
+		votes = undefined,
+		voterName = undefined,
+		onVote = undefined
 	}: {
 		rank?: number;
+		movieId?: string;
 		title: string;
 		score: number;
 		explanation?: Explanation;
 		per_member_score?: Record<string, number>;
 		fairness?: number;
 		memberOrder?: string[];
+		breakdown?: Record<string, number>;
+		votes?: Record<string, 'up' | 'veto'>;
+		voterName?: string;
+		onVote?: (movieId: string, vote: 'up' | 'veto' | 'clear') => void;
 	} = $props();
 
+	const upCount = $derived(votes ? Object.values(votes).filter((v) => v === 'up').length : 0);
+	const vetoCount = $derived(votes ? Object.values(votes).filter((v) => v === 'veto').length : 0);
+	const myVote = $derived(voterName && votes ? votes[voterName] : undefined);
+	const canVote = $derived(!!voterName && !!movieId && !!onVote);
+
+	function clickVote(v: 'up' | 'veto') {
+		if (!canVote) return;
+		const next = myVote === v ? 'clear' : v;
+		onVote!(movieId!, next);
+	}
+
+	// Signal-level decomposition. Skip rollup totals and zero contributions.
+	const SIGNAL_ORDER = ['svd', 'als', 'content', 'implicit_bonus', 'popularity_penalty', 'diversity_penalty'];
+	const SIGNAL_LABEL: Record<string, string> = {
+		svd: 'SVD',
+		als: 'ALS',
+		content: 'genome',
+		implicit_bonus: 'genre overlap',
+		popularity_penalty: 'pop. penalty',
+		diversity_penalty: 'diversity penalty'
+	};
+	const signals = $derived(
+		breakdown
+			? SIGNAL_ORDER.filter((k) => k in breakdown && Math.abs(breakdown[k]) > 0.005).map((k) => ({
+					key: k,
+					label: SIGNAL_LABEL[k] ?? k,
+					value: breakdown[k]
+				}))
+			: []
+	);
+	const signalMaxAbs = $derived(
+		signals.length ? Math.max(...signals.map((s) => Math.abs(s.value))) : 1
+	);
+
 	let poster = $state<string | null>(null);
+	let providers = $state<StreamingProvider[]>([]);
 	let expanded = $state(false);
 
 	$effect(() => {
-		tmdbPosterURL(title).then((p) => (poster = p));
+		tmdbMovieMeta(title).then((meta) => {
+			poster = meta.posterUrl;
+			providers = meta.providers;
+		});
 	});
 
 	const popClass: Record<string, string> = {
@@ -88,6 +136,26 @@
 				#{rank}
 			</span>
 		{/if}
+		{#if upCount > 0 || vetoCount > 0}
+			<div
+				class="absolute top-1.5 right-1.5 text-[10px] mono px-1.5 py-0.5 rounded flex items-center gap-1.5"
+				style="background: rgba(10, 12, 16, 0.78); border: 1px solid var(--border);"
+				title="{upCount} thumbs-up · {vetoCount} veto"
+			>
+				{#if upCount > 0}
+					<span class="flex items-center gap-0.5" style="color: #6ee7b7;">
+						<ThumbsUp size={9} />
+						{upCount}
+					</span>
+				{/if}
+				{#if vetoCount > 0}
+					<span class="flex items-center gap-0.5" style="color: #f87171;">
+						<Ban size={9} />
+						{vetoCount}
+					</span>
+				{/if}
+			</div>
+		{/if}
 	</div>
 
 	<div class="p-3 sm:p-4 flex-1 min-w-0">
@@ -135,6 +203,26 @@
 			</div>
 		{/if}
 
+		{#if providers.length}
+			<div class="mt-2 flex flex-wrap items-center gap-1.5" title="Available to stream">
+				{#each providers.slice(0, 5) as p (p.name)}
+					<img
+						src={p.logoUrl}
+						alt={p.name}
+						title={p.name}
+						class="w-5 h-5 rounded-[5px] border"
+						style="border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.05);"
+						loading="lazy"
+					/>
+				{/each}
+				{#if providers.length > 5}
+					<span class="text-[10px] mono" style="color: var(--ink-faint);">
+						+{providers.length - 5}
+					</span>
+				{/if}
+			</div>
+		{/if}
+
 		{#if ordered.length > 0}
 			<div class="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 items-center">
 				{#each ordered as m (m.name)}
@@ -159,7 +247,7 @@
 			</div>
 		{/if}
 
-		{#if explanation?.top_contributing_rated_movies?.length}
+		{#if explanation?.top_contributing_rated_movies?.length || signals.length}
 			<button
 				class="mt-2 text-xs hover:underline inline-flex items-center gap-1"
 				style="color: var(--ink-dim);"
@@ -173,23 +261,95 @@
 			</button>
 			{#if expanded}
 				<div
-					class="mt-2 text-xs rounded-md p-2.5 space-y-1"
+					class="mt-2 text-xs rounded-md p-2.5 space-y-2.5"
 					style="background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: var(--ink-muted);"
 					transition:fly={{ y: -4, duration: 200 }}
 				>
-					<div class="flex items-center gap-1.5 mb-1" style="color: var(--ink-dim);">
-						<Sparkles size={11} />
-						closest matches from your ratings:
-					</div>
-					{#each explanation.top_contributing_rated_movies as [t, r] (t)}
-						<div class="flex items-center gap-2">
-							<Star size={10} fill="currentColor" style="color: var(--accent);" />
-							<span class="flex-1">{t}</span>
-							<span class="mono text-[10px]" style="color: var(--ink-faint);">{r.toFixed(1)}★</span>
+					{#if signals.length}
+						<div>
+							<div class="flex items-center gap-1.5 mb-1.5" style="color: var(--ink-dim);">
+								<Sparkles size={11} />
+								what lifted this onto the list:
+							</div>
+							<div class="space-y-1">
+								{#each signals as s (s.key)}
+									{@const pct = (Math.abs(s.value) / signalMaxAbs) * 100}
+									{@const isNeg = s.value < 0}
+									<div class="flex items-center gap-2">
+										<span class="w-24 shrink-0 text-[10px] mono" style="color: var(--ink-faint);">
+											{s.label}
+										</span>
+										<div class="flex-1 relative h-1.5 rounded-sm" style="background: rgba(255,255,255,0.05);">
+											<div
+												class="absolute top-0 bottom-0 rounded-sm"
+												class:bg-emerald-500={!isNeg}
+												class:bg-rose-500={isNeg}
+												style="width: {pct.toFixed(1)}%; opacity: 0.8; {isNeg ? 'right: 50%;' : 'left: 50%;'} max-width: 50%;"
+											></div>
+											<div
+												class="absolute top-0 bottom-0 w-px"
+												style="left: 50%; background: rgba(255,255,255,0.15);"
+											></div>
+										</div>
+										<span class="w-10 text-right shrink-0 text-[10px] mono tabular-nums" style="color: var(--ink-faint);">
+											{s.value >= 0 ? '+' : ''}{s.value.toFixed(2)}
+										</span>
+									</div>
+								{/each}
+							</div>
 						</div>
-					{/each}
+					{/if}
+					{#if explanation?.top_contributing_rated_movies?.length}
+						<div>
+							<div class="flex items-center gap-1.5 mb-1" style="color: var(--ink-dim);">
+								<Star size={11} fill="currentColor" style="color: var(--accent);" />
+								closest matches from your ratings:
+							</div>
+							<div class="space-y-1">
+								{#each explanation.top_contributing_rated_movies as [t, r] (t)}
+									<div class="flex items-center gap-2">
+										<Star size={10} fill="currentColor" style="color: var(--accent);" />
+										<span class="flex-1">{t}</span>
+										<span class="mono text-[10px]" style="color: var(--ink-faint);">{r.toFixed(1)}★</span>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
 				</div>
 			{/if}
+		{/if}
+
+		{#if canVote}
+			<div class="mt-3 flex items-center gap-1.5 text-xs">
+				<button
+					type="button"
+					class="btn btn-pill text-xs px-2.5 py-1"
+					style={myVote === 'up'
+						? 'background: rgba(110, 231, 183, 0.18); border: 1px solid rgba(110, 231, 183, 0.55); color: #6ee7b7;'
+						: 'background: var(--surface); border: 1px solid var(--border); color: var(--ink-muted);'}
+					onclick={() => clickVote('up')}
+					title="Vote up as {voterName}"
+				>
+					<ThumbsUp size={11} />
+					yes
+				</button>
+				<button
+					type="button"
+					class="btn btn-pill text-xs px-2.5 py-1"
+					style={myVote === 'veto'
+						? 'background: rgba(248, 113, 113, 0.16); border: 1px solid rgba(248, 113, 113, 0.5); color: #fca5a5;'
+						: 'background: var(--surface); border: 1px solid var(--border); color: var(--ink-muted);'}
+					onclick={() => clickVote('veto')}
+					title="Veto as {voterName}"
+				>
+					<Ban size={11} />
+					skip
+				</button>
+				<span class="ml-1 text-[10px]" style="color: var(--ink-faint);">
+					voting as <strong style="color: var(--ink-muted);">{voterName}</strong>
+				</span>
+			</div>
 		{/if}
 	</div>
 </article>

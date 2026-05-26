@@ -39,7 +39,7 @@
 			<Sparkles size={11} />
 			3D · UMAP projection of ALS latent space
 		</span>
-		<h1 class="display-md mt-2" style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic;">
+		<h1 class="display-md mt-2" style="font-family: 'Playfair Display', Georgia, serif; font-style: italic;">
 			Your taste in <span class="text-gradient">3D</span>.
 		</h1>
 		<p class="text-sm max-w-3xl" style="color: var(--ink-muted);">

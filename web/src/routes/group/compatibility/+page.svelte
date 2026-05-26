@@ -1,21 +1,48 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { fly } from 'svelte/transition';
 	import { Loader2, ArrowRight, Heart, AlertTriangle } from 'lucide-svelte';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import Stat from '$lib/components/Stat.svelte';
-	import { analyzeGroup, type GroupAnalysis } from '$lib/api';
+	import { analyzeGroup, getGroup, type GroupAnalysis, type GroupState } from '$lib/api';
 	import { loadMembers } from '$lib/store';
 
-	const members = $state(loadMembers());
+	// Same dual-mode as /group/recommendations: ?group=ID hydrates from the
+	// server, otherwise fall back to localStorage members.
+	const groupId = $derived(page.url.searchParams.get('group'));
+	let serverGroup = $state<GroupState | null>(null);
+	const localMembers = $state(loadMembers());
+
+	const members = $derived(
+		serverGroup
+			? serverGroup.members.map((m) => ({ name: m.name, hash: m.hash }))
+			: localMembers.map((m) => ({ name: m.name, hash: m.hash }))
+	);
+
 	let busy = $state(true);
 	let error = $state<string | null>(null);
 	let report = $state<GroupAnalysis | null>(null);
 
 	$effect(() => {
+		if (groupId) {
+			getGroup(groupId)
+				.then((g) => (serverGroup = g))
+				.catch((e) => {
+					error = e instanceof Error ? e.message : String(e);
+					busy = false;
+				});
+		}
+	});
+
+	$effect(() => {
+		// Wait for the server group to land if one was requested.
+		if (groupId && !serverGroup) return;
 		if (members.length < 2) {
 			busy = false;
 			return;
 		}
+		busy = true;
+		report = null;
 		analyzeGroup({
 			hashes: members.map((m) => m.hash),
 			member_names: members.map((m) => m.name),
@@ -59,7 +86,7 @@
 	<header class="flex items-end justify-between flex-wrap gap-3">
 		<div>
 			<span class="chip chip-violet">Group · compatibility report</span>
-			<h1 class="display-md mt-2" style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic;">
+			<h1 class="display-md mt-2" style="font-family: 'Playfair Display', Georgia, serif; font-style: italic;">
 				How <span class="text-gradient">aligned</span> are you?
 			</h1>
 			<p class="text-sm" style="color: var(--ink-muted);">
@@ -67,15 +94,28 @@
 				vectors across the whole catalog.
 			</p>
 		</div>
-		<a href="/group/recommendations" class="btn btn-ghost btn-pill text-xs">
+		<a
+			href={groupId ? `/group/recommendations?group=${encodeURIComponent(groupId)}` : '/group/recommendations'}
+			class="btn btn-ghost btn-pill text-xs"
+		>
 			back to recs
 			<ArrowRight size={13} />
 		</a>
 	</header>
 
-	{#if members.length < 2}
+	{#if groupId && !serverGroup}
+		<div class="surface p-5 text-sm" style="color: var(--ink-muted);">
+			<Loader2 size={14} class="animate-spin inline mr-2" />
+			Loading shared group <code>{groupId}</code>…
+		</div>
+	{:else if members.length < 2}
 		<div class="surface p-5 text-sm" style="background: var(--rose-dim); border-color: rgba(248,113,113,0.3);">
-			Need at least 2 members. <a href="/" class="underline" style="color: #fca5a5;">Add some →</a>
+			Need at least 2 members.
+			{#if groupId}
+				Open <a href="/group/{groupId}/join" class="underline" style="color: #fca5a5;">the join link →</a>
+			{:else}
+				<a href="/" class="underline" style="color: #fca5a5;">Add some →</a>
+			{/if}
 		</div>
 	{:else if busy}
 		<div class="surface p-8 text-center">
@@ -193,8 +233,14 @@
 					<h2 class="text-base font-medium">Consensus picks</h2>
 				</div>
 				<p class="text-xs mb-3" style="color: var(--ink-faint);">
-					High mean rating, low std across all members — universally loved.
+					Films you all rated ≥ 3.5★ with tight agreement (σ ≤ 0.75).
 				</p>
+				{#if report.consensus_movies.length === 0}
+					<p class="text-xs italic px-2 py-3" style="color: var(--ink-faint);">
+						No clear consensus yet — either too few shared films, or no film cleared the bar
+						(mean ≥ 3.5★, σ ≤ 0.75). Try after everyone's added more ratings.
+					</p>
+				{:else}
 				<ul class="space-y-1.5 text-sm">
 					{#each report.consensus_movies as m, i (m.movie_id)}
 						<li
@@ -217,6 +263,7 @@
 						</li>
 					{/each}
 				</ul>
+				{/if}
 			</div>
 
 			<div class="surface p-5">
@@ -225,8 +272,16 @@
 					<h2 class="text-base font-medium">Disagreement picks</h2>
 				</div>
 				<p class="text-xs mb-3" style="color: var(--ink-faint);">
-					High std across members — the films you'd fight about.
+					Films where one member loves it and another would skip (σ ≥ 1.0★).
 				</p>
+				{#if report.disagreement_movies.length === 0}
+					<p class="text-xs italic px-2 py-3" style="color: var(--ink-faint);">
+						You're too aligned for real disagreement — no shared film has σ ≥ 1.0★.
+						{#if report.consensus_movies.length > 0}
+							That's a good sign for movie night.
+						{/if}
+					</p>
+				{:else}
 				<ul class="space-y-1.5 text-sm">
 					{#each report.disagreement_movies as m, i (m.movie_id)}
 						<li
@@ -249,6 +304,7 @@
 						</li>
 					{/each}
 				</ul>
+				{/if}
 			</div>
 		</div>
 	{/if}

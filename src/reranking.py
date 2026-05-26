@@ -81,6 +81,12 @@ class ModeWeights:
     fewer than N ratings in the trainset are dropped before scoring. This
     guards against statistical noise from long-tail items where the CF
     model has fit a single user's enthusiasm into a high item bias.
+
+    ``calibration_lambda`` swaps the pairwise-Jaccard MMR diversity step
+    for Steck-style calibrated rerank (RecSys 2018): match the rec list's
+    genre distribution to the user's historical taste distribution via KL
+    divergence. 0 = pure MMR (legacy). >0 = calibrated (MMR replaced).
+    Tunable via ``--mode calibrated`` once tuned; old modes stay on MMR.
     """
     svd: float = 1.0
     als: float = 1.0
@@ -89,6 +95,7 @@ class ModeWeights:
     diversity_penalty: float = 0.4
     content: float = 0.0  # Phase 2 plugs into this
     min_rating_count: int = 20
+    calibration_lambda: float = 0.0  # Steck-style; 0 disables (use MMR instead)
 
 
 MODE_WEIGHTS: Dict[str, ModeWeights] = {
@@ -115,6 +122,15 @@ MODE_WEIGHTS: Dict[str, ModeWeights] = {
     "serendipitous": ModeWeights(svd=0.6, als=0.9, popularity_penalty=0.7,
                                  implicit_bonus=0.7, diversity_penalty=1.0,
                                  content=0.7, min_rating_count=25),
+    # Steck-calibrated: same scoring as `balanced` but the diversity step
+    # is replaced with KL-divergence-driven genre calibration. The rec
+    # list's genre distribution matches the user's historical preference
+    # distribution — fixes MMR's tendency to over-penalize "all drama"
+    # lists when the user genuinely is mostly drama.
+    "calibrated": ModeWeights(svd=1.0, als=1.0, popularity_penalty=0.7,
+                              implicit_bonus=0.5, diversity_penalty=0.0,
+                              content=0.6, min_rating_count=50,
+                              calibration_lambda=2.0),
 }
 
 
@@ -284,10 +300,16 @@ class ALSScorer:
         user_ratings: Dict[str, float],
         watched_movies: Optional[Iterable[str]] = None,
         n_return: int = 1000,
+        filter_seen: bool = True,
     ) -> Dict[str, float]:
         """Returns top-``n_return`` scored items as {movieId: score}. ALS
         recommend() can return all items, but in practice 1000 is plenty
-        for downstream union + re-rank."""
+        for downstream union + re-rank.
+
+        ``filter_seen=False`` includes already-rated/watched items in the
+        output — required by the "Including seen" / rewatch surface so
+        films the user explicitly loves can still be ranked.
+        """
         user_vec = self._build_user_vector(user_ratings, watched_movies)
         if user_vec is None:
             return {}
@@ -296,7 +318,7 @@ class ALSScorer:
             user_items=user_vec,
             N=n_return,
             recalculate_user=True,
-            filter_already_liked_items=True,
+            filter_already_liked_items=filter_seen,
         )
         out: Dict[str, float] = {}
         for idx, sc in zip(ids, scores):
@@ -305,7 +327,7 @@ class ALSScorer:
 
 
 # ---------------------------------------------------------------------------
-# Diversity (Jaccard on genres)
+# Diversity (Jaccard on genres) + calibration (Steck 2018)
 # ---------------------------------------------------------------------------
 
 def _genre_jaccard(a: Set[str], b: Set[str]) -> float:
@@ -314,6 +336,65 @@ def _genre_jaccard(a: Set[str], b: Set[str]) -> float:
     inter = len(a & b)
     union = len(a | b) or 1
     return inter / union
+
+
+def _user_target_genre_dist(
+    user_ratings: Dict[str, float],
+    genre_features: Dict[str, Set[str]],
+) -> Dict[str, float]:
+    """User's preferred genre distribution from rating history.
+
+    For each rated film, distributes a weight of ``max(0, rating-2)`` evenly
+    across its assigned genres, then normalizes to a probability distribution.
+    Returns ``{}`` if the user has no positive-rated film with genres.
+    """
+    raw: Dict[str, float] = {}
+    for mid, rating in user_ratings.items():
+        if rating < 3.0:
+            continue
+        weight = rating - 2.0  # 3.0 → 1.0, 5.0 → 3.0
+        genres = genre_features.get(str(mid), set())
+        if not genres:
+            continue
+        per_genre = weight / len(genres)
+        for g in genres:
+            raw[g] = raw.get(g, 0.0) + per_genre
+    total = sum(raw.values())
+    if total <= 0:
+        return {}
+    return {g: v / total for g, v in raw.items()}
+
+
+def _kl_after_add(
+    target: Dict[str, float],
+    q_raw: Dict[str, float],
+    n_current: int,
+    candidate_genres: Set[str],
+    alpha: float = 0.01,
+) -> float:
+    """KL(target || smoothed_new_q) after hypothetically adding a candidate.
+
+    ``q_raw[g]`` is the running unnormalized count over picked items so far
+    (each item contributes 1/|its_genres| to each of its genres). The
+    candidate is added without mutating q_raw — caller updates after pick.
+    Smoothing α ensures KL is finite even when q has no mass in some genre.
+    """
+    if not candidate_genres:
+        share = 0.0
+    else:
+        share = 1.0 / len(candidate_genres)
+    n_new = n_current + 1
+    kl = 0.0
+    for g, p in target.items():
+        if p <= 0:
+            continue
+        q_raw_new = q_raw.get(g, 0.0) + (share if g in candidate_genres else 0.0)
+        q_norm = q_raw_new / n_new
+        q_smooth = (1.0 - alpha) * q_norm + alpha * p
+        if q_smooth <= 1e-12:
+            continue
+        kl += p * math.log(p / q_smooth)
+    return kl
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +506,7 @@ class Reranker:
         min_rating_count: int = 0,
         exclude_rated: bool = True,
         exclude_watched: bool = True,
+        extra_exclude: Optional[Set[str]] = None,
     ) -> Tuple[Set[str], Dict[str, float], Dict[str, float]]:
         """Union top-N candidates from each scorer; return (candidates, svd_scores, als_scores).
 
@@ -449,9 +531,23 @@ class Reranker:
             exclude |= {str(m) for m in user_ratings}
         if exclude_watched and watched_movies:
             exclude |= {str(m) for m in watched_movies}
+        if extra_exclude:
+            exclude |= {str(m) for m in extra_exclude}
 
+        # If the caller explicitly wants seen films back in the pool, also
+        # disable ALS's internal filter — otherwise rated/watched items get
+        # silently dropped from ALS candidates even though our outer filter
+        # is off.
+        als_filter_seen = exclude_rated or exclude_watched
         svd_scores = self.svd.score_all(user_ratings) if self.svd else {}
-        als_scores = self.als.score_all(user_ratings, watched_movies, n_return=n_per_source * 2) if self.als else {}
+        als_scores = (
+            self.als.score_all(
+                user_ratings, watched_movies,
+                n_return=n_per_source * 2,
+                filter_seen=als_filter_seen,
+            )
+            if self.als else {}
+        )
 
         # Trim each to top-N per source by raw score; union the IDs.
         top_svd = sorted(svd_scores.items(), key=lambda kv: kv[1], reverse=True)[: n_per_source]
@@ -529,6 +625,7 @@ class Reranker:
         watched_movies: Optional[Iterable[str]],
         candidate_ids: Iterable[str],
         mode: str = "balanced",
+        filter_seen: bool = True,
     ) -> Dict[str, float]:
         """Score an explicit list of candidates for this user, bypassing
         candidate generation. Used by group aggregation to compute the
@@ -537,6 +634,9 @@ class Reranker:
 
         Returns {movieId: final_score} only for candidates the member can
         actually score (item in at least one of the underlying CF models).
+
+        ``filter_seen=False`` lets ALS rank already-rated/watched items —
+        needed when the union pool intentionally contains seen films.
         """
         weights = MODE_WEIGHTS.get(mode)
         if weights is None:
@@ -549,7 +649,14 @@ class Reranker:
                 if self.popularity.counts.get(c, 0) >= weights.min_rating_count
             }
         svd_all = self.svd.score_all(user_ratings) if self.svd else {}
-        als_all = self.als.score_all(user_ratings, watched_movies, n_return=max(2000, len(candidate_ids))) if self.als else {}
+        als_all = (
+            self.als.score_all(
+                user_ratings, watched_movies,
+                n_return=max(2000, len(candidate_ids)),
+                filter_seen=filter_seen,
+            )
+            if self.als else {}
+        )
 
         svd_norm = _minmax({mid: svd_all[mid] for mid in candidate_ids if mid in svd_all})
         als_norm = _minmax({mid: als_all[mid] for mid in candidate_ids if mid in als_all})
@@ -600,6 +707,7 @@ class Reranker:
         n_candidates: int = DEFAULT_CANDIDATE_POOL_SIZE,
         exclude_rated: bool = True,
         exclude_watched: bool = True,
+        extra_exclude: Optional[Set[str]] = None,
     ) -> List[ScoredCandidate]:
         weights = MODE_WEIGHTS.get(mode)
         if weights is None:
@@ -614,6 +722,7 @@ class Reranker:
             min_rating_count=weights.min_rating_count,
             exclude_rated=exclude_rated,
             exclude_watched=exclude_watched,
+            extra_exclude=extra_exclude,
         )
         if not candidates:
             return []
@@ -701,26 +810,47 @@ class Reranker:
                 "base_total": svd_term + als_term - pop_term + imp_term + content_term,
             }
 
-        # Greedy MMR: pick highest base score, then iteratively penalize remaining
-        # candidates by their max genre-Jaccard with the already-picked set.
+        # Greedy reranking: either Steck-calibrated (KL to user's genre target)
+        # or legacy MMR (max pairwise Jaccard with picked set). Calibrated
+        # path activates when ``calibration_lambda > 0``; otherwise MMR.
         remaining = dict(base_scores)
         picked: List[str] = []
         results: List[ScoredCandidate] = []
+        calibrated = weights.calibration_lambda > 0
+        target_dist = (
+            _user_target_genre_dist(user_ratings, self.genre_features)
+            if calibrated else {}
+        )
+        q_raw: Dict[str, float] = {}  # running unnormalized genre counts over picked
+        lam = weights.calibration_lambda
+
         while remaining and len(results) < top_n:
             best_mid: Optional[str] = None
             best_total = -math.inf
             for mid, parts in remaining.items():
-                if picked:
+                base = parts["base_total"]
+                if calibrated and target_dist:
+                    cand_genres = self.genre_features.get(mid, set())
+                    kl_after = _kl_after_add(target_dist, q_raw, len(picked), cand_genres)
+                    # Steck's KL penalty — added to base (not the (1-λ)·rel−λ·KL
+                    # convex form, which requires relevance and KL to be on
+                    # comparable scales; here base_total ≈ 2.0 and KL ≈ 0.05,
+                    # so λ acts as a direct multiplier analogous to
+                    # diversity_penalty in the MMR path).
+                    total = base - lam * kl_after
+                    parts["diversity_penalty"] = -lam * kl_after
+                elif picked:
                     cand_genres = self.genre_features.get(mid, set())
                     redundancy = max(
                         _genre_jaccard(cand_genres, self.genre_features.get(p, set()))
                         for p in picked
                     )
+                    div_term = weights.diversity_penalty * redundancy
+                    total = base - div_term
+                    parts["diversity_penalty"] = -div_term
                 else:
-                    redundancy = 0.0
-                div_term = weights.diversity_penalty * redundancy
-                total = parts["base_total"] - div_term
-                parts["diversity_penalty"] = -div_term
+                    total = base
+                    parts["diversity_penalty"] = 0.0
                 if total > best_total:
                     best_total = total
                     best_mid = mid
@@ -756,5 +886,12 @@ class Reranker:
                 explanation=explanation,
             ))
             picked.append(best_mid)
+            # Update running genre distribution for the calibrated path.
+            if calibrated:
+                pg = self.genre_features.get(best_mid, set())
+                if pg:
+                    share = 1.0 / len(pg)
+                    for g in pg:
+                        q_raw[g] = q_raw.get(g, 0.0) + share
             del remaining[best_mid]
         return results

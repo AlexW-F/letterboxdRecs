@@ -29,9 +29,15 @@ import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import explore as explore_router, meta, recommendations as rec_router
-from .schemas import HealthResponse, UploadOut
+from .routers import (
+    explore as explore_router,
+    groups as groups_router,
+    meta,
+    recommendations as rec_router,
+)
+from .schemas import HealthResponse, UploadOut, UploadUsernameRequest
 from .state import load_state
+from ..letterboxd_rss import LetterboxdScraperError, fetch_user_blobs, validate_username
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +61,7 @@ app.add_middleware(
 app.include_router(meta.router)
 app.include_router(rec_router.router)
 app.include_router(explore_router.router)
+app.include_router(groups_router.router)
 
 
 @app.on_event("startup")
@@ -201,44 +208,120 @@ async def upload_letterboxd(
         None,
         description="watched_with_tmdb.csv — used for implicit feedback and watched-exclusion",
     ),
+    watchlist: Optional[UploadFile] = File(
+        None,
+        description="watchlist.csv — films the user wants to watch; powers /group/watchlist-overlap",
+    ),
 ) -> UploadOut:
     state = request.app.state.models
     ratings_bytes = await ratings.read()
     if not ratings_bytes:
         raise HTTPException(status_code=400, detail="Empty ratings file")
     payload_hash = _hash_csv(ratings_bytes)
-    if payload_hash in state.cache:
-        cached = state.cache[payload_hash]
-        return UploadOut(
-            hash=payload_hash,
-            n_ratings_in=cached["n_input"],
-            n_ratings_mapped=len(cached["ratings"]),
-            n_with_tmdb=cached["n_with_tmdb"],
-        )
 
-    mapping, n_input, n_with_tmdb = _ratings_csv_to_movielens(
-        ratings_bytes, state.links_df, state.cache, state.tmdb_api_key,
-    )
-    watched_ids: set[str] = set()
+    # Hit-or-miss on ratings; watched/watchlist are merged in even on a hit
+    # so re-uploading with previously-omitted side files still updates state.
+    cached = state.cache.get(payload_hash)
+    if cached is None:
+        mapping, n_input, n_with_tmdb = _ratings_csv_to_movielens(
+            ratings_bytes, state.links_df, state.cache, state.tmdb_api_key,
+        )
+        cached = {
+            "ratings": mapping,
+            "watched_movie_ids": [],
+            "watchlist_movie_ids": [],
+            "n_input": n_input,
+            "n_with_tmdb": n_with_tmdb,
+        }
+    else:
+        # Older cache entries may pre-date the watchlist field
+        cached.setdefault("watchlist_movie_ids", [])
+
     if watched is not None:
         watched_bytes = await watched.read()
         if watched_bytes:
             try:
-                watched_ids = _watched_csv_to_movielens(
+                cached["watched_movie_ids"] = list(_watched_csv_to_movielens(
                     watched_bytes, state.links_df, state.cache, state.tmdb_api_key,
-                )
+                ))
             except Exception as e:  # noqa: BLE001
                 logger.warning("watched.csv parse failed: %s — proceeding without it", e)
 
-    state.cache[payload_hash] = {
-        "ratings": mapping,
-        "watched_movie_ids": list(watched_ids),
-        "n_input": n_input,
-        "n_with_tmdb": n_with_tmdb,
-    }
+    if watchlist is not None:
+        watchlist_bytes = await watchlist.read()
+        if watchlist_bytes:
+            try:
+                # Same shape as watched.csv (Name, Year, Letterboxd URI) — reuse the parser.
+                cached["watchlist_movie_ids"] = list(_watched_csv_to_movielens(
+                    watchlist_bytes, state.links_df, state.cache, state.tmdb_api_key,
+                ))
+            except Exception as e:  # noqa: BLE001
+                logger.warning("watchlist.csv parse failed: %s — proceeding without it", e)
+
+    state.cache[payload_hash] = cached
     return UploadOut(
         hash=payload_hash,
-        n_ratings_in=n_input,
-        n_ratings_mapped=len(mapping),
-        n_with_tmdb=n_with_tmdb,
+        n_ratings_in=cached["n_input"],
+        n_ratings_mapped=len(cached["ratings"]),
+        n_with_tmdb=cached["n_with_tmdb"],
+        n_watchlist=len(cached["watchlist_movie_ids"]),
+        source=cached.get("source", "csv"),
+        letterboxd_username=cached.get("letterboxd_username"),
+    )
+
+
+@app.post("/upload-letterboxd-username", response_model=UploadOut)
+async def upload_letterboxd_username(
+    payload: UploadUsernameRequest, request: Request,
+) -> UploadOut:
+    """Ingest the most-recent ~50 ratings from a public Letterboxd profile's
+    RSS feed. Letterboxd's HTML is Cloudflare-gated so this is the only
+    no-login route to recent ratings; the CSV upload path remains for users
+    who want their full history."""
+    state = request.app.state.models
+    try:
+        username = validate_username(payload.username)
+        ratings_blob, watched_blob, _n_rated, _n_watched = fetch_user_blobs(username)
+    except LetterboxdScraperError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    payload_hash = _hash_csv(ratings_blob)
+    cached = state.cache.get(payload_hash)
+    if cached is None:
+        mapping, n_input, n_with_tmdb = _ratings_csv_to_movielens(
+            ratings_blob, state.links_df, state.cache, state.tmdb_api_key,
+        )
+        watched_ids: list = []
+        if watched_blob:
+            try:
+                watched_ids = list(_watched_csv_to_movielens(
+                    watched_blob, state.links_df, state.cache, state.tmdb_api_key,
+                ))
+            except Exception as e:  # noqa: BLE001
+                logger.warning("synthesized watched parse failed: %s", e)
+        cached = {
+            "ratings": mapping,
+            "watched_movie_ids": watched_ids,
+            "watchlist_movie_ids": [],
+            "n_input": n_input,
+            "n_with_tmdb": n_with_tmdb,
+            "source": "letterboxd_rss",
+            "letterboxd_username": username,
+        }
+    else:
+        # Same RSS content already cached. Tag it with the username for the
+        # UI if it came from a CSV originally (rare but harmless).
+        cached.setdefault("source", "letterboxd_rss")
+        cached.setdefault("letterboxd_username", username)
+        cached.setdefault("watchlist_movie_ids", [])
+
+    state.cache[payload_hash] = cached
+    return UploadOut(
+        hash=payload_hash,
+        n_ratings_in=cached["n_input"],
+        n_ratings_mapped=len(cached["ratings"]),
+        n_with_tmdb=cached["n_with_tmdb"],
+        n_watchlist=len(cached["watchlist_movie_ids"]),
+        source=cached.get("source", "letterboxd_rss"),
+        letterboxd_username=cached.get("letterboxd_username"),
     )
