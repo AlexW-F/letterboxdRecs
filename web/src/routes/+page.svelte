@@ -7,10 +7,9 @@
 		Loader2
 	} from 'lucide-svelte';
 	import MovieSpaceHero from '$lib/components/MovieSpaceHero.svelte';
-	import { createGroup, createDemoGroup } from '$lib/api';
+	import { createGroup } from '$lib/api';
 
 	let creatingGroup = $state(false);
-	let creatingDemo = $state(false);
 	let error = $state<string | null>(null);
 
 	// Device-aware hero density. The hero builds an O(n²) k-NN web at mount,
@@ -44,18 +43,6 @@
 		}
 	}
 
-	async function tryDemo() {
-		error = null;
-		creatingDemo = true;
-		try {
-			const g = await createDemoGroup();
-			goto(`/group/recommendations?group=${g.group_id}`);
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-		} finally {
-			creatingDemo = false;
-		}
-	}
 </script>
 
 <!--
@@ -139,19 +126,6 @@
 					onclick={() => goto('/me')}
 				>
 					Just me →
-				</button>
-				<button
-					type="button"
-					class="text-sm underline hover:opacity-80 transition disabled:opacity-40"
-					style="color: var(--ink-muted);"
-					onclick={tryDemo}
-					disabled={creatingDemo}
-				>
-					{#if creatingDemo}
-						loading sample group…
-					{:else}
-						or try with three sample cinephiles →
-					{/if}
 				</button>
 				{#if error}
 					<p class="text-xs" style="color: #fca5a5;">{error}</p>
