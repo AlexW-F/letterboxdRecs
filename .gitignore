@@ -41,3 +41,6 @@ __pycache__/
 /node_modules
 /package.json
 /package-lock.json
+
+# Cloudflare wrangler local state (auth, cache, observability)
+.wrangler/
