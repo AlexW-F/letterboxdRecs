@@ -2,7 +2,7 @@
 
 **movienight** — a group movie-recommendation web app built on Letterboxd exports + the MovieLens 32M dataset. Friends each contribute their watch history (Letterboxd username via RSS, or full CSV export); the backend folds everyone into the same ALS latent space, blends in Tag Genome relevance and TMDB plot embeddings, and produces a re-ranked group recommendation list with per-member fairness controls. Includes a shareable join link with QR code, real-time voting on the shortlist, a "shared watchlist" overlap view, and a 3D UMAP visualization of your taste in latent space.
 
-Repo: [github.com/AlexW-F/letterboxdRecs](https://github.com/AlexW-F/letterboxdRecs)
+Live: [movienight.alex-wf.com](https://movienight.alex-wf.com) · Repo: [github.com/AlexW-F/letterboxdRecs](https://github.com/AlexW-F/letterboxdRecs)
 
 ## What you can do
 
@@ -73,7 +73,7 @@ OpenAPI docs at `http://localhost:8000/docs`.
 | `POST /group/analyze` | pairwise compatibility report + threshold-gated consensus / disagreement lists |
 | `POST /group/watchlist-overlap` | films multiple members already want to see |
 | `POST /group` | create a shareable group → returns `group_id` |
-| `POST /group/demo` | seed a shareable group with 3 cached demo users so first-time visitors can see the experience |
+| `POST /group/demo` | spin up a shareable group seeded with 3 cached Letterboxd users (handy for API smoke tests) |
 | `POST /group/{id}/join` | add a member (existing upload hash + display name) |
 | `POST /group/{id}/vote` | cast `up` / `veto` / `clear` on a film |
 | `GET  /group/{id}` | fetch current group state (members + votes) |
@@ -160,6 +160,10 @@ Reports land in `evaluation_results/phase3_at_scale_v2.md`.
 - ⏳ Second dataset replication (Amazon Movies or anime)
 - ⏳ Per-user-cluster eval (cinephile vs mainstream NDCG breakdown)
 
+## Contributing
+
+Issues and PRs welcome — especially around the eval harness (more baselines, second-dataset replication) and the group-aggregation strategies. There's no formal contribution process; open an issue first if you're planning a non-trivial change so we can talk through it.
+
 ## License
 
-MIT.
+[MIT](./LICENSE).

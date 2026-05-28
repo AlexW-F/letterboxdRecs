@@ -1,42 +1,40 @@
-# sv
+# movienight — frontend
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit + Tailwind frontend for [movienight](../README.md). Hosts the landing
+page hero (3D ALS-latent-space point cloud rendered with Three.js), the
+group-recs flow, voting UI, compatibility report, and the personalized `/explore`
+viz.
 
-## Creating a project
+In production this is built with `@sveltejs/adapter-cloudflare` and deployed to
+Cloudflare Pages; the API runs separately on Hugging Face Spaces and is
+addressed via `VITE_API_BASE`. In docker compose, an nginx sidecar serves the
+built app and proxies `/api/*` to the FastAPI container on the internal
+network.
 
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv@0.15.3 create --template minimal --types ts --install npm web
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Local dev
 
 ```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+npm install
+VITE_API_BASE=http://localhost:8000 VITE_TMDB_KEY=your_tmdb_v3_key npm run dev
+# open http://localhost:5173/
 ```
 
-## Building
+Both env vars are optional:
 
-To create a production version of your app:
+- `VITE_API_BASE` — base URL for the FastAPI backend (default
+  `http://localhost:8000`). At runtime you can also set
+  `window.LBRECS_API` from an injected `<script>` tag to override it without
+  rebuilding (handy on Cloudflare Pages → HF Spaces deploys).
+- `VITE_TMDB_KEY` — TMDB v3 read key. Without it, posters and
+  streaming-availability badges silently degrade. Grab one at
+  https://www.themoviedb.org/settings/api.
+
+## Build
 
 ```sh
-npm run build
+npm run build      # production build
+npm run preview    # serve the built app locally
 ```
 
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+See the [project root README](../README.md) for the full stack, dataset
+requirements, and architecture overview.
