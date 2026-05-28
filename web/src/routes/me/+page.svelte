@@ -12,6 +12,7 @@
 		type IndividualRecResponse,
 		type Mode
 	} from '$lib/api';
+	import { addMember } from '$lib/store';
 
 	let modes = $state<Mode[]>([]);
 	let mode = $state('balanced');
@@ -44,6 +45,8 @@
 				const u = await uploadLetterboxd(ratingsFile, watchedFile);
 				hash = u.hash;
 				uploadInfo = { in: u.n_ratings_in, mapped: u.n_ratings_mapped, with_tmdb: u.n_with_tmdb };
+				// Persist so /explore + /group/* can find this device's upload.
+				addMember({ name: u.letterboxd_username ?? 'you', hash: u.hash, upload: u });
 			}
 			result = await recommendIndividual({
 				hash: hash!,
