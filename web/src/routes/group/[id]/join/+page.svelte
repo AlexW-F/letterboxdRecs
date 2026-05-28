@@ -234,16 +234,7 @@
 				<h2 class="text-base font-medium">Add yourself</h2>
 			</div>
 
-			<div class="flex items-center gap-1 text-sm" role="tablist">
-				<button
-					type="button"
-					class="btn btn-pill text-xs {mode === 'username' ? 'btn-secondary' : 'btn-ghost'}"
-					onclick={() => (mode = 'username')}
-					disabled={uploading}
-				>
-					<AtSign size={12} />
-					Letterboxd username
-				</button>
+			<div class="flex items-center gap-1 text-sm flex-wrap" role="tablist">
 				<button
 					type="button"
 					class="btn btn-pill text-xs {mode === 'csv' ? 'btn-secondary' : 'btn-ghost'}"
@@ -252,6 +243,17 @@
 				>
 					<FileText size={12} />
 					CSV export
+					<span class="text-[10px] mono ml-1" style="color: var(--brand);">full history</span>
+				</button>
+				<button
+					type="button"
+					class="btn btn-pill text-xs {mode === 'username' ? 'btn-secondary' : 'btn-ghost'}"
+					onclick={() => (mode = 'username')}
+					disabled={uploading}
+				>
+					<AtSign size={12} />
+					Letterboxd username
+					<span class="text-[10px] mono ml-1" style="color: #fca5a5;">~50 only</span>
 				</button>
 			</div>
 
@@ -283,10 +285,17 @@
 						class="input"
 						disabled={uploading}
 					/>
-					<p class="text-[11px] flex items-center gap-1.5" style="color: var(--ink-faint);">
-						<Rss size={10} />
-						~50 most-recent ratings via Letterboxd RSS — full history requires CSV.
-					</p>
+					<div
+						class="text-[11px] rounded-md px-3 py-2 leading-relaxed flex items-start gap-2"
+						style="background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.3); color: #fecaca;"
+					>
+						<Rss size={12} style="flex-shrink: 0; margin-top: 1px;" />
+						<div>
+							<strong>Heads up:</strong> usernames only pull your ~50 most-recent ratings via
+							Letterboxd's RSS feed. Recommendations will be noticeably weaker than uploading
+							your full <code>ratings.csv</code> export — switch to the CSV tab if you can.
+						</div>
+					</div>
 				</div>
 			{:else}
 				<input
