@@ -118,6 +118,7 @@
 				alt={title}
 				class="w-full h-full object-cover transition duration-500 group-hover:scale-105"
 				loading="lazy"
+				onerror={() => (poster = null)}
 			/>
 			<div
 				class="absolute inset-0 pointer-events-none"

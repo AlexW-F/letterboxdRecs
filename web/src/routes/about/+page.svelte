@@ -101,9 +101,6 @@
 
 				<dt style="color: var(--ink-faint);">model files</dt>
 				<dd class="col-span-2 mono text-xs" style="color: var(--ink-muted);">{health.model_name}</dd>
-
-				<dt style="color: var(--ink-faint);">cache</dt>
-				<dd class="col-span-2 mono text-xs" style="color: var(--ink-dim);">{health.cache_dir}</dd>
 			</dl>
 		</div>
 	{/if}

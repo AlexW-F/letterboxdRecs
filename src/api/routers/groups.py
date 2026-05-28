@@ -173,29 +173,32 @@ def join_group(group_id: str, req: GroupJoinRequest, request: Request) -> GroupS
     but joining with a new hash under the same name *replaces* the previous
     upload (useful when re-uploading a refreshed CSV)."""
     state = _state(request)
-    group = _load_group(state, group_id)
-    # Pull metadata from the underlying upload entry so the group page can
-    # render member chips with rating counts etc. without N extra requests.
-    if req.hash not in state.cache:
-        raise HTTPException(status_code=400,
-                            detail=f"unknown upload hash {req.hash!r}; "
-                                   "upload via /upload-letterboxd[-username] first")
-    upload = state.cache[req.hash]
-    new_member = {
-        "name": req.name.strip(),
-        "hash": req.hash,
-        "n_ratings_mapped": len(upload.get("ratings") or {}),
-        "n_watchlist": len(upload.get("watchlist_movie_ids") or []),
-        "source": upload.get("source", "csv"),
-        "letterboxd_username": upload.get("letterboxd_username"),
-        "joined_at": time.time(),
-    }
-    members = list(group.get("members", []))
-    # Replace any existing entry under the same display name (idempotent re-join)
-    members = [m for m in members if m["name"] != new_member["name"]]
-    members.append(new_member)
-    group["members"] = members
-    _save_group(state, group_id, group)
+    # transact() makes the read-modify-write atomic so concurrent joins from
+    # different phones don't clobber each other (lost-update race).
+    with state.cache.transact():
+        group = _load_group(state, group_id)
+        # Pull metadata from the underlying upload entry so the group page can
+        # render member chips with rating counts etc. without N extra requests.
+        if req.hash not in state.cache:
+            raise HTTPException(status_code=400,
+                                detail=f"unknown upload hash {req.hash!r}; "
+                                       "upload via /upload-letterboxd[-username] first")
+        upload = state.cache[req.hash]
+        new_member = {
+            "name": req.name.strip(),
+            "hash": req.hash,
+            "n_ratings_mapped": len(upload.get("ratings") or {}),
+            "n_watchlist": len(upload.get("watchlist_movie_ids") or []),
+            "source": upload.get("source", "csv"),
+            "letterboxd_username": upload.get("letterboxd_username"),
+            "joined_at": time.time(),
+        }
+        members = list(group.get("members", []))
+        # Replace any existing entry under the same display name (idempotent re-join)
+        members = [m for m in members if m["name"] != new_member["name"]]
+        members.append(new_member)
+        group["members"] = members
+        _save_group(state, group_id, group)
     return _to_out(group)
 
 
@@ -203,17 +206,18 @@ def join_group(group_id: str, req: GroupJoinRequest, request: Request) -> GroupS
 def leave_group(group_id: str, member_name: str, request: Request) -> GroupStateOut:
     """Remove a member from the group + clear any of their votes."""
     state = _state(request)
-    group = _load_group(state, group_id)
-    group["members"] = [m for m in group.get("members", []) if m["name"] != member_name]
-    # Also clear any votes the leaving member cast
-    votes = group.get("votes") or {}
-    for mid in list(votes):
-        if member_name in votes[mid]:
-            del votes[mid][member_name]
-            if not votes[mid]:
-                del votes[mid]
-    group["votes"] = votes
-    _save_group(state, group_id, group)
+    with state.cache.transact():
+        group = _load_group(state, group_id)
+        group["members"] = [m for m in group.get("members", []) if m["name"] != member_name]
+        # Also clear any votes the leaving member cast
+        votes = group.get("votes") or {}
+        for mid in list(votes):
+            if member_name in votes[mid]:
+                del votes[mid][member_name]
+                if not votes[mid]:
+                    del votes[mid]
+        group["votes"] = votes
+        _save_group(state, group_id, group)
     return _to_out(group)
 
 
@@ -230,18 +234,19 @@ def cast_vote(group_id: str, req: GroupVoteRequest, request: Request) -> GroupSt
     surfaces votes on whichever films it chooses to show. This keeps the
     server stateless about which films are "candidates"."""
     state = _state(request)
-    group = _load_group(state, group_id)
-    votes = group.get("votes") or {}
-    mid = str(req.movie_id)
-    member_votes = votes.get(mid, {})
-    if req.vote == "clear":
-        member_votes.pop(req.member_name, None)
-    else:
-        member_votes[req.member_name] = req.vote
-    if member_votes:
-        votes[mid] = member_votes
-    else:
-        votes.pop(mid, None)
-    group["votes"] = votes
-    _save_group(state, group_id, group)
+    with state.cache.transact():
+        group = _load_group(state, group_id)
+        votes = group.get("votes") or {}
+        mid = str(req.movie_id)
+        member_votes = votes.get(mid, {})
+        if req.vote == "clear":
+            member_votes.pop(req.member_name, None)
+        else:
+            member_votes[req.member_name] = req.vote
+        if member_votes:
+            votes[mid] = member_votes
+        else:
+            votes.pop(mid, None)
+        group["votes"] = votes
+        _save_group(state, group_id, group)
     return _to_out(group)

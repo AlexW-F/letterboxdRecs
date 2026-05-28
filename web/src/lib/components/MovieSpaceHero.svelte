@@ -38,6 +38,13 @@
 
 	let cleanup: (() => void) | null = null;
 
+	// Accessibility: when the user asks for reduced motion we render a single
+	// static frame instead of running the drift/twinkle/pulse rAF loop.
+	const reduceMotion =
+		typeof window !== 'undefined' &&
+		typeof window.matchMedia === 'function' &&
+		window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 	onMount(async () => {
 		let data: BackgroundScatter;
 		try {
@@ -49,6 +56,12 @@
 		}
 
 		const THREE = await import('three');
+
+		// The galactic-web (k-NN lines) is an O(n²) build done synchronously at
+		// mount — it stalls low-power phones. Skip it on small screens / sparse
+		// clouds; keep it for the denser desktop scene where it reads well.
+		const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1280;
+		const buildWeb = points >= 3000 && viewportW >= 1024;
 
 		// ---------------------------------------------------------------
 		// Scene + renderer
@@ -233,110 +246,119 @@
 		// once at init: each star connects to its 2 nearest neighbors if
 		// they're within MAX_LINK_DIST. Filter ensures sparse regions
 		// stay sparse and dense clusters web together.
+		//
+		// This is O(n²) and synchronous, so it's gated behind `buildWeb`
+		// (desktop + dense cloud only). On phones we skip it entirely.
 		// ---------------------------------------------------------------
-		const K_LINKS = 2;
-		const MAX_LINK_DIST = 1.9; // world units; cloud scaled radius ~28
-		const MAX_LINK_DIST_SQ = MAX_LINK_DIST * MAX_LINK_DIST;
+		let links: import('three').LineSegments | null = null;
+		let lineGeo: import('three').BufferGeometry | null = null;
+		let lineMaterial: import('three').ShaderMaterial | null = null;
 
-		const tmpPairs: Array<[number, number, number]> = []; // [i, j, distSq]
-		for (let i = 0; i < n; i++) {
-			let best1 = -1, best2 = -1, bd1 = Infinity, bd2 = Infinity;
-			const xi = positions[3 * i],
-				yi = positions[3 * i + 1],
-				zi = positions[3 * i + 2];
-			for (let j = 0; j < n; j++) {
-				if (i === j) continue;
-				const dx = xi - positions[3 * j],
-					dy = yi - positions[3 * j + 1],
-					dz = zi - positions[3 * j + 2];
-				const d2 = dx * dx + dy * dy + dz * dz;
-				if (d2 > MAX_LINK_DIST_SQ) continue;
-				if (d2 < bd1) {
-					bd2 = bd1;
-					best2 = best1;
-					bd1 = d2;
-					best1 = j;
-				} else if (d2 < bd2) {
-					bd2 = d2;
-					best2 = j;
+		if (buildWeb) {
+			const K_LINKS = 2;
+			const MAX_LINK_DIST = 1.9; // world units; cloud scaled radius ~28
+			const MAX_LINK_DIST_SQ = MAX_LINK_DIST * MAX_LINK_DIST;
+
+			const tmpPairs: Array<[number, number, number]> = []; // [i, j, distSq]
+			for (let i = 0; i < n; i++) {
+				let best1 = -1, best2 = -1, bd1 = Infinity, bd2 = Infinity;
+				const xi = positions[3 * i],
+					yi = positions[3 * i + 1],
+					zi = positions[3 * i + 2];
+				for (let j = 0; j < n; j++) {
+					if (i === j) continue;
+					const dx = xi - positions[3 * j],
+						dy = yi - positions[3 * j + 1],
+						dz = zi - positions[3 * j + 2];
+					const d2 = dx * dx + dy * dy + dz * dz;
+					if (d2 > MAX_LINK_DIST_SQ) continue;
+					if (d2 < bd1) {
+						bd2 = bd1;
+						best2 = best1;
+						bd1 = d2;
+						best1 = j;
+					} else if (d2 < bd2) {
+						bd2 = d2;
+						best2 = j;
+					}
 				}
+				if (best1 >= 0 && i < best1) tmpPairs.push([i, best1, bd1]);
+				if (K_LINKS >= 2 && best2 >= 0 && i < best2) tmpPairs.push([i, best2, bd2]);
 			}
-			if (best1 >= 0 && i < best1) tmpPairs.push([i, best1, bd1]);
-			if (K_LINKS >= 2 && best2 >= 0 && i < best2) tmpPairs.push([i, best2, bd2]);
+
+			const segs = tmpPairs.length;
+			const linePositions = new Float32Array(segs * 2 * 3);
+			const lineColors = new Float32Array(segs * 2 * 3);
+			const lineSeeds = new Float32Array(segs * 2);
+			for (let s = 0; s < segs; s++) {
+				const [i, j] = tmpPairs[s];
+				linePositions[s * 6 + 0] = positions[3 * i];
+				linePositions[s * 6 + 1] = positions[3 * i + 1];
+				linePositions[s * 6 + 2] = positions[3 * i + 2];
+				linePositions[s * 6 + 3] = positions[3 * j];
+				linePositions[s * 6 + 4] = positions[3 * j + 1];
+				linePositions[s * 6 + 5] = positions[3 * j + 2];
+				// Blend the two endpoint colors so each segment shifts naturally
+				// along its length (genre A -> genre B gradients).
+				lineColors[s * 6 + 0] = colors[3 * i];
+				lineColors[s * 6 + 1] = colors[3 * i + 1];
+				lineColors[s * 6 + 2] = colors[3 * i + 2];
+				lineColors[s * 6 + 3] = colors[3 * j];
+				lineColors[s * 6 + 4] = colors[3 * j + 1];
+				lineColors[s * 6 + 5] = colors[3 * j + 2];
+				const seed = Math.random();
+				lineSeeds[s * 2] = seed;
+				lineSeeds[s * 2 + 1] = seed;
+			}
+
+			lineGeo = new THREE.BufferGeometry();
+			lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+			lineGeo.setAttribute('color', new THREE.BufferAttribute(lineColors, 3));
+			lineGeo.setAttribute('aSeed', new THREE.BufferAttribute(lineSeeds, 1));
+
+			lineMaterial = new THREE.ShaderMaterial({
+				uniforms: { uTime: { value: 0 } },
+				vertexShader: /* glsl */ `
+					attribute float aSeed;
+					varying vec3 vColor;
+					varying float vDist;
+					varying float vPulse;
+					uniform float uTime;
+					void main() {
+						vColor = color;
+						vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+						vDist = -mvPosition.z;
+						// Each link has its own pulse phase via aSeed; both endpoints
+						// share the seed so the whole segment lights together.
+						// pow(sin, 6) sharpens the wave into a brief flash with a
+						// long dim baseline — galactic-circuit feel.
+						float wave = 0.5 + 0.5 * sin(uTime * 0.85 + aSeed * 11.0);
+						float flash = pow(wave, 6.0);
+						vPulse = 0.18 + 3.2 * flash;
+						gl_Position = projectionMatrix * mvPosition;
+					}
+				`,
+				fragmentShader: /* glsl */ `
+					varying vec3 vColor;
+					varying float vDist;
+					varying float vPulse;
+					void main() {
+						float depthFade = 1.0 - smoothstep(14.0, 55.0, vDist);
+						// Hot-white peak during the flash, colored ambient otherwise.
+						vec3 col = mix(vColor * 0.85, vec3(1.0), clamp(vPulse * 0.18, 0.0, 0.7));
+						float a = 0.09 * depthFade * vPulse;
+						gl_FragColor = vec4(col, a);
+					}
+				`,
+				blending: THREE.AdditiveBlending,
+				depthWrite: false,
+				transparent: true,
+				vertexColors: true
+			});
+
+			links = new THREE.LineSegments(lineGeo, lineMaterial);
+			scene.add(links);
 		}
-
-		const segs = tmpPairs.length;
-		const linePositions = new Float32Array(segs * 2 * 3);
-		const lineColors = new Float32Array(segs * 2 * 3);
-		const lineSeeds = new Float32Array(segs * 2);
-		for (let s = 0; s < segs; s++) {
-			const [i, j] = tmpPairs[s];
-			linePositions[s * 6 + 0] = positions[3 * i];
-			linePositions[s * 6 + 1] = positions[3 * i + 1];
-			linePositions[s * 6 + 2] = positions[3 * i + 2];
-			linePositions[s * 6 + 3] = positions[3 * j];
-			linePositions[s * 6 + 4] = positions[3 * j + 1];
-			linePositions[s * 6 + 5] = positions[3 * j + 2];
-			// Blend the two endpoint colors so each segment shifts naturally
-			// along its length (genre A -> genre B gradients).
-			lineColors[s * 6 + 0] = colors[3 * i];
-			lineColors[s * 6 + 1] = colors[3 * i + 1];
-			lineColors[s * 6 + 2] = colors[3 * i + 2];
-			lineColors[s * 6 + 3] = colors[3 * j];
-			lineColors[s * 6 + 4] = colors[3 * j + 1];
-			lineColors[s * 6 + 5] = colors[3 * j + 2];
-			const seed = Math.random();
-			lineSeeds[s * 2] = seed;
-			lineSeeds[s * 2 + 1] = seed;
-		}
-
-		const lineGeo = new THREE.BufferGeometry();
-		lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
-		lineGeo.setAttribute('color', new THREE.BufferAttribute(lineColors, 3));
-		lineGeo.setAttribute('aSeed', new THREE.BufferAttribute(lineSeeds, 1));
-
-		const lineMaterial = new THREE.ShaderMaterial({
-			uniforms: { uTime: { value: 0 } },
-			vertexShader: /* glsl */ `
-				attribute float aSeed;
-				varying vec3 vColor;
-				varying float vDist;
-				varying float vPulse;
-				uniform float uTime;
-				void main() {
-					vColor = color;
-					vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-					vDist = -mvPosition.z;
-					// Each link has its own pulse phase via aSeed; both endpoints
-					// share the seed so the whole segment lights together.
-					// pow(sin, 6) sharpens the wave into a brief flash with a
-					// long dim baseline — galactic-circuit feel.
-					float wave = 0.5 + 0.5 * sin(uTime * 0.85 + aSeed * 11.0);
-					float flash = pow(wave, 6.0);
-					vPulse = 0.18 + 3.2 * flash;
-					gl_Position = projectionMatrix * mvPosition;
-				}
-			`,
-			fragmentShader: /* glsl */ `
-				varying vec3 vColor;
-				varying float vDist;
-				varying float vPulse;
-				void main() {
-					float depthFade = 1.0 - smoothstep(14.0, 55.0, vDist);
-					// Hot-white peak during the flash, colored ambient otherwise.
-					vec3 col = mix(vColor * 0.85, vec3(1.0), clamp(vPulse * 0.18, 0.0, 0.7));
-					float a = 0.09 * depthFade * vPulse;
-					gl_FragColor = vec4(col, a);
-				}
-			`,
-			blending: THREE.AdditiveBlending,
-			depthWrite: false,
-			transparent: true,
-			vertexColors: true
-		});
-
-		const links = new THREE.LineSegments(lineGeo, lineMaterial);
-		scene.add(links);
 
 		// ---------------------------------------------------------------
 		// Pick
@@ -431,10 +453,12 @@
 		const lookTarget = new THREE.Vector3();
 
 		const animate = () => {
-			const t = (performance.now() - start) / 1000;
+			// Reduced-motion: freeze time at a fixed phase so the scene is
+			// composed (camera off-center, some labels visible) but never moves.
+			const t = reduceMotion ? 18 : (performance.now() - start) / 1000;
 			starMaterial.uniforms.uTime.value = t;
 			glowMaterial.uniforms.uTime.value = t;
-			lineMaterial.uniforms.uTime.value = t;
+			if (lineMaterial) lineMaterial.uniforms.uTime.value = t;
 
 			// Slowed by 2.5–3x from before so the labels have time to be read.
 			const driftR = 8;
@@ -455,7 +479,7 @@
 			// Cloud spin halved as well.
 			stars.rotation.y = t * 0.005;
 			glow.rotation.y = t * 0.005;
-			links.rotation.y = t * 0.005;
+			if (links) links.rotation.y = t * 0.005;
 
 			// Pick (~30 Hz)
 			if (performance.now() - lastPickTime > 33 && pointer.x > -1.5) {
@@ -476,7 +500,9 @@
 
 			// Recompute *candidates* (which stars get a label) at ~10 Hz.
 			// Positions update every frame below — this only changes the set.
-			if (performance.now() - lastLabelTime > 100) {
+			// Skipped under reduced-motion: labels need follow-up frames to
+			// fade in + track, which we don't run, so we omit them entirely.
+			if (!reduceMotion && performance.now() - lastLabelTime > 100) {
 				lastLabelTime = performance.now();
 				const camX = camera.position.x,
 					camY = camera.position.y,
@@ -611,7 +637,8 @@
 			}
 
 			renderer.render(scene, camera);
-			raf = requestAnimationFrame(animate);
+			// Reduced-motion: render a single static frame, never reschedule.
+			if (!reduceMotion) raf = requestAnimationFrame(animate);
 		};
 		animate();
 		loading = false;
@@ -626,10 +653,10 @@
 			renderer.domElement.removeEventListener('pointermove', onPointerMove);
 			renderer.domElement.removeEventListener('pointerleave', onPointerLeave);
 			geometry.dispose();
-			lineGeo.dispose();
+			lineGeo?.dispose();
 			starMaterial.dispose();
 			glowMaterial.dispose();
-			lineMaterial.dispose();
+			lineMaterial?.dispose();
 			renderer.dispose();
 			renderer.domElement.remove();
 		};
@@ -712,7 +739,7 @@
 					<span style="color: var(--ink-faint); margin-left: 0.4rem;">· {hoveredGenre}</span>
 				{/if}
 			{:else}
-				✦  drift through the latent space  ✦  drag to look around
+				✦  drift through the latent space{#if enableDrag}  ✦  drag to look around{/if}
 			{/if}
 		</div>
 

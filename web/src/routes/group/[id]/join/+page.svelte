@@ -47,9 +47,17 @@
 
 	$effect(() => {
 		if (!groupId) return;
+		// Initial load surfaces errors; subsequent polls refresh silently so
+		// members joining from other phones appear live without a manual reload.
 		getGroup(groupId)
 			.then((g) => (group = g))
 			.catch((e) => (loadErr = e instanceof Error ? e.message : String(e)));
+		const id = setInterval(() => {
+			getGroup(groupId)
+				.then((g) => (group = g))
+				.catch(() => {});
+		}, 6000);
+		return () => clearInterval(id);
 	});
 
 	$effect(() => {
@@ -326,12 +334,12 @@
 			</button>
 		</div>
 
-		{#if group.members.length >= 2}
-			<div class="flex justify-between items-center">
-				<button class="btn btn-ghost btn-pill text-xs" onclick={() => goto('/')}>
-					<ArrowLeft size={12} />
-					home
-				</button>
+		<div class="flex justify-between items-center gap-3 flex-wrap">
+			<button class="btn btn-ghost btn-pill text-xs" onclick={() => goto('/')}>
+				<ArrowLeft size={12} />
+				home
+			</button>
+			{#if group.members.length >= 2}
 				<button
 					class="btn btn-primary"
 					onclick={() => goto(`/group/recommendations?group=${encodeURIComponent(groupId)}`)}
@@ -339,7 +347,12 @@
 					See group recs
 					<ArrowRight size={14} />
 				</button>
-			</div>
-		{/if}
+			{:else if group.members.length === 1}
+				<span class="flex items-center gap-2 text-xs" style="color: var(--ink-muted);">
+					<Loader2 size={12} class="animate-spin" />
+					Waiting for friends to join… share the link above. Group recs unlock at 2 members.
+				</span>
+			{/if}
+		</div>
 	{/if}
 </section>

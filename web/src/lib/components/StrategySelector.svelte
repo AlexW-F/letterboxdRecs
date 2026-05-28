@@ -11,10 +11,12 @@
 	<div class="text-[10px] uppercase tracking-[0.14em]" style="color: var(--ink-faint);">
 		Group strategy
 	</div>
-	<div class="flex flex-wrap gap-1.5">
+	<div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Group strategy">
 		{#each strategies as s (s.name)}
 			<button
 				type="button"
+				role="radio"
+				aria-checked={value === s.name}
 				onclick={() => (value = s.name)}
 				class="px-3 py-1.5 rounded-md text-sm transition"
 				style={value === s.name

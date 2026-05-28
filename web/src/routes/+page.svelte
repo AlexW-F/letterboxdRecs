@@ -13,6 +13,24 @@
 	let creatingDemo = $state(false);
 	let error = $state<string | null>(null);
 
+	// Device-aware hero density. The hero builds an O(n²) k-NN web at mount,
+	// which freezes low-power phones at ~5000 points. Scale the cloud down on
+	// small / low-core / low-memory devices, up to ~3500 on capable desktops.
+	// SSR-safe: defaults to a conservative count when there's no window.
+	function computeHeroPoints(): number {
+		if (typeof window === 'undefined') return 2000;
+		const w = window.innerWidth;
+		const cores = navigator.hardwareConcurrency ?? 4;
+		// deviceMemory is non-standard (Chromium-only); treat absent as mid-range.
+		const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4;
+
+		if (w < 640 || cores <= 4 || mem <= 4) return 1500;
+		if (w < 1024 || cores <= 6 || mem <= 6) return 2500;
+		return 3500;
+	}
+
+	const heroPoints = computeHeroPoints();
+
 	async function createShareableGroup() {
 		error = null;
 		creatingGroup = true;
@@ -53,7 +71,7 @@
 >
 	<MovieSpaceHero
 		height="100vh"
-		points={5000}
+		points={heroPoints}
 		enableDrag={false}
 		parallaxStrength={0.25}
 	/>

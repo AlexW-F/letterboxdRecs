@@ -146,6 +146,15 @@ class PopularityModel:
         self.counts: Dict[str, int] = {str(k): int(v) for k, v in counts.items()}
         self.max_count = max(self.counts.values()) if self.counts else 1
 
+    @classmethod
+    def from_counts(cls, counts: Dict[str, int]) -> "PopularityModel":
+        """Build from a precomputed ``{movieId: count}`` mapping, skipping the
+        full ratings-file scan (see ``scripts/build_popularity.py``)."""
+        obj = cls.__new__(cls)
+        obj.counts = {str(k): int(v) for k, v in counts.items()}
+        obj.max_count = max(obj.counts.values()) if obj.counts else 1
+        return obj
+
     def log_norm(self, movie_id: str) -> float:
         """log(1 + popularity) / log(1 + max). In [0, 1]."""
         c = self.counts.get(str(movie_id), 0)

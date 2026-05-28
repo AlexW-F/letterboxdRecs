@@ -6,9 +6,7 @@ import pandas as pd
 
 from typing import Optional
 
-# In the future set the environmental variable TMDB_API_KEY
-# TMDB_API_KEY = os.getenv("TMDB_API_KEY")  # or set your key here directly
-TMDB_API_KEY = "a7ccc8e80f65b980a21bc5d164dcb026"
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
 if not TMDB_API_KEY:
     raise RuntimeError("Please set your TMDB_API_KEY environment variable")

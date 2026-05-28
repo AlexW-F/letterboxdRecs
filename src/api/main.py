@@ -20,6 +20,8 @@ from __future__ import annotations
 import hashlib
 import io
 import logging
+import os
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
@@ -35,11 +37,32 @@ from .routers import (
     meta,
     recommendations as rec_router,
 )
+from . import limits
 from .schemas import HealthResponse, UploadOut, UploadUsernameRequest
 from .state import load_state
 from ..letterboxd_rss import LetterboxdScraperError, fetch_user_blobs, validate_username
 
 logger = logging.getLogger(__name__)
+
+# Public-endpoint DoS guards: cap the raw upload body and how many unmatched
+# titles we'll enrich against TMDB per request (TMDB calls run on our key).
+MAX_UPLOAD_BYTES = limits.MAX_BODY_BYTES
+MAX_ENRICH_ROWS = int(os.getenv("MAX_ENRICH_ROWS", "5000"))
+
+# Allowed CORS origins, comma-separated. Defaults to local dev servers; set
+# CORS_ALLOW_ORIGINS to the deployed frontend origin(s) in production.
+_DEFAULT_ORIGINS = "http://localhost:5173,http://localhost:4173"
+CORS_ALLOW_ORIGINS = [
+    o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip()
+]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Deserialize models once at startup — too slow to pay per request.
+    app.state.models = load_state()
+    yield
+
 
 app = FastAPI(
     title="letterboxdRecs API",
@@ -48,13 +71,17 @@ app = FastAPI(
         "recommendations powered by SVD + ALS + tag-content TF-IDF re-ranking."
     ),
     version="0.3.0",
+    lifespan=lifespan,
 )
 
+# Inner: per-IP rate limiting + body-size guard. Added before CORS so CORS is
+# the outermost layer and 429/413 responses still carry CORS headers.
+app.add_middleware(limits.RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:4173"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=CORS_ALLOW_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -62,11 +89,6 @@ app.include_router(meta.router)
 app.include_router(rec_router.router)
 app.include_router(explore_router.router)
 app.include_router(groups_router.router)
-
-
-@app.on_event("startup")
-def _load_models() -> None:
-    app.state.models = load_state()
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -80,7 +102,6 @@ def health(request: Request) -> HealthResponse:
             content_loaded=False,
             catalog_size=0,
             model_name="",
-            cache_dir="",
         )
     return HealthResponse(
         status="ok",
@@ -89,7 +110,6 @@ def health(request: Request) -> HealthResponse:
         content_loaded=state.content is not None,
         catalog_size=len(state.movies_df),
         model_name=state.svd_path.name + " + " + state.als_path.name,
-        cache_dir=str(state.cache.directory),
         movie_space_loaded=state.movie_space_index is not None,
     )
 
@@ -142,6 +162,15 @@ def _enrich_with_tmdb(
 
     if not to_fetch:
         return df
+    if len(to_fetch) > MAX_ENRICH_ROWS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"too many titles need TMDB enrichment ({len(to_fetch)} > {MAX_ENRICH_ROWS}). "
+                "Pre-enrich with scripts/add_tmdb_ids.py, or use the Letterboxd-username "
+                "flow (TMDB IDs arrive inline via RSS)."
+            ),
+        )
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         results = list(pool.map(lambda a: lookup(*a), args))
@@ -217,6 +246,11 @@ async def upload_letterboxd(
     ratings_bytes = await ratings.read()
     if not ratings_bytes:
         raise HTTPException(status_code=400, detail="Empty ratings file")
+    if len(ratings_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"ratings file too large (max {MAX_UPLOAD_BYTES} bytes)",
+        )
     payload_hash = _hash_csv(ratings_bytes)
 
     # Hit-or-miss on ratings; watched/watchlist are merged in even on a hit
@@ -244,7 +278,8 @@ async def upload_letterboxd(
                 cached["watched_movie_ids"] = list(_watched_csv_to_movielens(
                     watched_bytes, state.links_df, state.cache, state.tmdb_api_key,
                 ))
-            except Exception as e:  # noqa: BLE001
+            except (ValueError, KeyError, UnicodeDecodeError,
+                    pd.errors.ParserError, pd.errors.EmptyDataError, HTTPException) as e:
                 logger.warning("watched.csv parse failed: %s — proceeding without it", e)
 
     if watchlist is not None:
@@ -255,7 +290,8 @@ async def upload_letterboxd(
                 cached["watchlist_movie_ids"] = list(_watched_csv_to_movielens(
                     watchlist_bytes, state.links_df, state.cache, state.tmdb_api_key,
                 ))
-            except Exception as e:  # noqa: BLE001
+            except (ValueError, KeyError, UnicodeDecodeError,
+                    pd.errors.ParserError, pd.errors.EmptyDataError, HTTPException) as e:
                 logger.warning("watchlist.csv parse failed: %s — proceeding without it", e)
 
     state.cache[payload_hash] = cached
@@ -297,7 +333,8 @@ async def upload_letterboxd_username(
                 watched_ids = list(_watched_csv_to_movielens(
                     watched_blob, state.links_df, state.cache, state.tmdb_api_key,
                 ))
-            except Exception as e:  # noqa: BLE001
+            except (ValueError, KeyError, UnicodeDecodeError,
+                    pd.errors.ParserError, pd.errors.EmptyDataError, HTTPException) as e:
                 logger.warning("synthesized watched parse failed: %s", e)
         cached = {
             "ratings": mapping,
