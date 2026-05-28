@@ -63,7 +63,7 @@ CORS_ALLOW_ORIGINS = [
 DEMO_USERNAMES: list[tuple[str, str]] = [
     ("dave", "dave"),
     ("karsten", "karsten"),
-    ("lucy", "lucy"),
+    ("davidehrlich", "david ehrlich"),
 ]
 
 
