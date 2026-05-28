@@ -96,9 +96,14 @@
 				class="absolute inset-0 grid place-items-center z-10 pointer-events-none"
 				style="background: rgba(10, 12, 16, 0.5); backdrop-filter: blur(4px);"
 			>
-				<div class="flex items-center gap-3 text-sm" style="color: var(--ink-muted);">
-					<Loader2 size={18} class="animate-spin" style="color: var(--violet);" />
-					projecting <em>{selectedLabel}</em> into the latent space…
+				<div class="flex flex-col items-center gap-2 text-sm" style="color: var(--ink-muted);">
+					<div class="flex items-center gap-3">
+						<Loader2 size={18} class="animate-spin" style="color: var(--violet);" />
+						projecting <em>{selectedLabel}</em> into the latent space…
+					</div>
+					<p class="text-xs" style="color: var(--ink-faint);">
+						First projection can take up to a minute on a cold server — cached after that.
+					</p>
 				</div>
 			</div>
 		{/if}

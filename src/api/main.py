@@ -57,10 +57,27 @@ CORS_ALLOW_ORIGINS = [
 ]
 
 
+# Three popular Letterboxd accounts seeded at startup so /group/demo has real
+# data on a fresh deploy. Picked for taste variety; if any 404s the demo just
+# shows fewer members. Display name = handle.
+DEMO_USERNAMES: list[tuple[str, str]] = [
+    ("dave", "dave"),
+    ("karsten", "karsten"),
+    ("lucy", "lucy"),
+]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Deserialize models once at startup — too slow to pay per request.
     app.state.models = load_state()
+    # Seed the /group/demo cache from 3 Letterboxd users via RSS in a daemon
+    # thread so the 3 fetches don't add 30-45s to cold-start. The endpoint
+    # returns a friendly 503 until seeding finishes.
+    import threading
+    threading.Thread(
+        target=_seed_demo_users, args=(app.state.models,), daemon=True
+    ).start()
     yield
 
 
@@ -304,6 +321,51 @@ async def upload_letterboxd(
         source=cached.get("source", "csv"),
         letterboxd_username=cached.get("letterboxd_username"),
     )
+
+
+def _seed_demo_users(state) -> None:
+    """Populate the cache with DEMO_USERNAMES so /group/demo works on a fresh
+    deploy. Mirrors the upload-letterboxd-username flow per user. Runs in a
+    daemon thread from lifespan; failures are logged + skipped so the API
+    boots even if Letterboxd is unreachable. Persists the resulting
+    ``[(display, hash), ...]`` list under cache key ``demo::members`` for
+    the /group/demo endpoint to read.
+    """
+    seeded: list[tuple[str, str]] = []
+    for handle, display in DEMO_USERNAMES:
+        try:
+            username = validate_username(handle)
+            ratings_blob, watched_blob, _n_rated, _n_watched = fetch_user_blobs(username)
+            payload_hash = _hash_csv(ratings_blob)
+            if payload_hash not in state.cache:
+                mapping, n_input, n_with_tmdb = _ratings_csv_to_movielens(
+                    ratings_blob, state.links_df, state.cache, state.tmdb_api_key,
+                )
+                watched_ids: list = []
+                if watched_blob:
+                    try:
+                        watched_ids = list(_watched_csv_to_movielens(
+                            watched_blob, state.links_df, state.cache, state.tmdb_api_key,
+                        ))
+                    except (ValueError, KeyError, UnicodeDecodeError,
+                            pd.errors.ParserError, pd.errors.EmptyDataError, HTTPException) as e:
+                        logger.warning("demo seed: watched parse failed for %s: %s", username, e)
+                state.cache[payload_hash] = {
+                    "ratings": mapping,
+                    "watched_movie_ids": watched_ids,
+                    "watchlist_movie_ids": [],
+                    "n_input": n_input,
+                    "n_with_tmdb": n_with_tmdb,
+                    "source": "letterboxd_rss",
+                    "letterboxd_username": username,
+                }
+            seeded.append((display, payload_hash))
+            logger.info("demo seed: cached %s -> %s", username, payload_hash[:10])
+        except Exception as e:  # noqa: BLE001 - background task, swallow all
+            logger.warning("demo seed: skipping %s: %s", handle, e)
+    if seeded:
+        state.cache["demo::members"] = seeded
+        logger.info("demo seed: %d/%d ready", len(seeded), len(DEMO_USERNAMES))
 
 
 @app.post("/upload-letterboxd-username", response_model=UploadOut)

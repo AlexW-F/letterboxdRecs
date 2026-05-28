@@ -77,30 +77,33 @@ def _to_out(group: dict) -> GroupStateOut:
 # ---------------------------------------------------------------------------
 
 
-# Demo seed: three cached uploads so first-time visitors can see the
-# experience without having to wait through a real upload. Hashes refer
-# to existing entries in the diskcache. If they go missing (cache wiped
-# / fresh deployment), the /demo endpoint 503s with a useful message.
-DEMO_MEMBERS: list[tuple[str, str]] = [
-    ("alex (cinephile)",   "278f2d37600571dc3af2ea7c64ed5e15ad0424b48d33918a6a92eb834403d911"),
-    ("sara (cinephile)",   "51fe5049194116fbae62aa301454acef0763d8564695e0b324c62ecd798ed47d"),
-    ("mike (drama)",       "a1c51fa4adde1e0269d1484e0b786cb1e9fdbf591b794a76f79f0826d5f629d1"),
-]
+# Demo members are seeded at API startup from a hardcoded set of Letterboxd
+# usernames via the RSS path (see ``main._seed_demo_users``). The seeder
+# writes ``[(display_name, upload_hash), ...]`` under ``demo::members``;
+# if absent (seed still running, or all RSS fetches failed) /demo returns
+# 503 with a "try again in a moment" message.
+_DEMO_CACHE_KEY = "demo::members"
 
 
 @router.post("/demo", response_model=GroupStateOut)
 def create_demo_group(request: Request) -> GroupStateOut:
-    """Spin up a fresh shared group seeded with the three cached demo
-    members so first-time visitors can see the group experience without
-    uploading anything. Each call mints a new group_id so demo users
-    don't share vote state."""
+    """Spin up a fresh shared group seeded with the cached demo members so
+    first-time visitors can see the group experience without uploading
+    anything. Each call mints a new group_id so demo users don't share
+    vote state."""
     state = _state(request)
-    missing = [name for name, h in DEMO_MEMBERS if h not in state.cache]
+    demo_members: list[tuple[str, str]] = state.cache.get(_DEMO_CACHE_KEY) or []
+    if not demo_members:
+        raise HTTPException(
+            status_code=503,
+            detail=("demo data isn't seeded yet — usually ready ~30s after a cold start. "
+                    "Try again in a moment, or upload your own."),
+        )
+    missing = [name for name, h in demo_members if h not in state.cache]
     if missing:
         raise HTTPException(
             status_code=503,
-            detail=(f"demo data not in cache (missing: {', '.join(missing)}). "
-                    "The operator needs to seed demo uploads first."),
+            detail=f"demo cache evicted (missing: {', '.join(missing)})",
         )
     for _ in range(5):
         gid = _new_group_id()
@@ -110,14 +113,14 @@ def create_demo_group(request: Request) -> GroupStateOut:
         raise HTTPException(status_code=500, detail="group ID generation failed")
     now = time.time()
     members = []
-    for name, h in DEMO_MEMBERS:
+    for name, h in demo_members:
         upload = state.cache[h]
         members.append({
             "name": name,
             "hash": h,
             "n_ratings_mapped": len(upload.get("ratings") or {}),
             "n_watchlist": len(upload.get("watchlist_movie_ids") or []),
-            "source": upload.get("source", "csv"),
+            "source": upload.get("source", "letterboxd_rss"),
             "letterboxd_username": upload.get("letterboxd_username"),
             "joined_at": now,
         })
