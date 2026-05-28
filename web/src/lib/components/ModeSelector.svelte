@@ -10,10 +10,12 @@
 
 <div class="space-y-2">
 	<div class="text-[10px] uppercase tracking-[0.14em]" style="color: var(--ink-faint);">{label}</div>
-	<div class="flex flex-wrap gap-1.5">
+	<div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label={label}>
 		{#each modes as m (m.name)}
 			<button
 				type="button"
+				role="radio"
+				aria-checked={value === m.name}
 				onclick={() => (value = m.name)}
 				class="px-3 py-1.5 rounded-md text-sm transition"
 				style={value === m.name

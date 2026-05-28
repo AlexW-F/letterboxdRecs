@@ -6,6 +6,7 @@ request. Exposed via ``app.state.models``.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -14,8 +15,6 @@ from typing import Optional
 
 import pandas as pd
 from diskcache import Cache
-
-import re
 
 from ..content_features import ContentFeatures
 from ..evaluation import build_genre_features
@@ -50,6 +49,26 @@ class ModelState:
     group_strategies_set: frozenset = frozenset(GROUP_STRATEGIES)
 
 
+def _load_popularity(ml_dir: Path) -> PopularityModel:
+    """Per-movie rating counts. Prefer a precomputed JSON (built by
+    ``scripts/build_popularity.py``) so we don't load the full ~32M-row
+    ``ratings.csv`` at startup — that read dominates both memory and
+    cold-start time on a constrained host. Falls back to streaming the
+    raw ratings file when the precomputed table is absent.
+    """
+    pop_path = Path(os.getenv("POPULARITY_FILE", PROJECT_ROOT / "data" / "popularity.json"))
+    if pop_path.exists():
+        with open(pop_path) as f:
+            counts = json.load(f)
+        logger.info("loaded precomputed popularity from %s (%d movies)", pop_path, len(counts))
+        return PopularityModel.from_counts(counts)
+    ratings_csv = ml_dir / "ratings.csv"
+    logger.warning("no precomputed popularity at %s — reading %s (slow: ~32M rows). "
+                   "Run scripts/build_popularity.py to precompute.", pop_path, ratings_csv)
+    ratings_df = pd.read_csv(ratings_csv, usecols=["movieId"])
+    return PopularityModel(ratings_df)
+
+
 def load_state() -> ModelState:
     models_dir = Path(os.getenv("MODELS_DIR", PROJECT_ROOT / "models"))
     ml_dir = Path(os.getenv("ML_DATA_DIR", PROJECT_ROOT / "ml-32m"))
@@ -65,8 +84,7 @@ def load_state() -> ModelState:
     als = ALSScorer.from_path(als_path)
 
     movies_df = pd.read_csv(ml_dir / "movies.csv")
-    ratings_df = pd.read_csv(ml_dir / "ratings.csv", usecols=["movieId"])
-    popularity = PopularityModel(ratings_df)
+    popularity = _load_popularity(ml_dir)
     genre_features = build_genre_features(movies_df)
     title_of = {
         str(mid): title
@@ -79,6 +97,8 @@ def load_state() -> ModelState:
     links_df = links_df.dropna(subset=["tmdbId"]).copy()
     links_df["tmdbId"] = links_df["tmdbId"].astype(int).astype(str)
     links_df["movieId"] = links_df["movieId"].astype(str)
+    # Dedup so a single tmdbId can't fan a rating out to multiple movieIds.
+    links_df = links_df.drop_duplicates(subset="tmdbId")
 
     content = None
     if content_path.with_suffix(".npz").exists():
@@ -147,16 +167,8 @@ def load_state() -> ModelState:
     else:
         logger.warning("no movie-space index at %s — /explore is static", msi_path)
 
-    # TMDB key for server-side enrichment of raw Letterboxd uploads.
+    # TMDB key for server-side enrichment of raw Letterboxd uploads. Env only.
     tmdb_key = os.getenv("TMDB_API_KEY")
-    if not tmdb_key:
-        # Fallback: existing scripts/add_tmdb_ids.py used to hardcode one.
-        scaffold = PROJECT_ROOT / "scripts" / "add_tmdb_ids.py"
-        if scaffold.exists():
-            m = re.search(r'TMDB_API_KEY\s*=\s*"([a-f0-9]{20,})"', scaffold.read_text())
-            if m:
-                tmdb_key = m.group(1)
-                logger.info("loaded TMDB key from scripts/add_tmdb_ids.py")
     if not tmdb_key:
         logger.warning("no TMDB_API_KEY available — uploads of raw Letterboxd CSVs "
                        "(without a tmdb_id column) will be rejected")

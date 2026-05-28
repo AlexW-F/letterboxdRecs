@@ -94,7 +94,6 @@ export interface Health {
 	content_loaded: boolean;
 	catalog_size: number;
 	model_name: string;
-	cache_dir: string;
 	movie_space_loaded: boolean;
 }
 

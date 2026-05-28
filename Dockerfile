@@ -44,8 +44,9 @@ COPY scripts /app/scripts
 ENV MODELS_DIR=/app/models \
     ML_DATA_DIR=/app/ml-32m \
     CACHE_DIR=/app/.api_cache \
-    CONTENT_FEATURES=/app/data/content_features \
-    SVD_FILE=svd_full.pkl \
+    CONTENT_FEATURES=/app/data/content_genome \
+    POPULARITY_FILE=/app/data/popularity.json \
+    SVD_FILE=svd_full_slim.pkl \
     ALS_FILE=als_full.pkl
 
 EXPOSE 8000

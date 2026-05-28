@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { fly } from 'svelte/transition';
 	import { Loader2, Wand2, Upload, RefreshCw, RotateCcw } from 'lucide-svelte';
 	import FileDropzone from '$lib/components/FileDropzone.svelte';
 	import ModeSelector from '$lib/components/ModeSelector.svelte';
@@ -98,8 +97,8 @@
 				Recommendations <span class="text-gradient">for one</span>.
 			</h1>
 			<p class="text-sm" style="color: var(--ink-muted);">
-				Upload your Letterboxd ratings, get top-N across four modes. Pick a tone, adjust the
-				exclusion toggles, recompute.
+				Upload your Letterboxd ratings, get top-N across {modes.length || 'several'} modes. Pick a
+				tone, adjust the exclusion toggles, recompute.
 			</p>
 		</div>
 		<a

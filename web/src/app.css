@@ -18,8 +18,8 @@
 	/* Text */
 	--ink: #f5f7fa;
 	--ink-muted: rgba(245, 247, 250, 0.65);
-	--ink-dim: rgba(245, 247, 250, 0.4);
-	--ink-faint: rgba(245, 247, 250, 0.25);
+	--ink-dim: rgba(245, 247, 250, 0.6);
+	--ink-faint: rgba(245, 247, 250, 0.42);
 
 	/* Brand */
 	--brand: #34d399; /* emerald — primary action */
@@ -321,6 +321,35 @@ body {
 	);
 	background-size: 200% 100%;
 	animation: shimmer 1.6s linear infinite;
+}
+
+/* ----------------------------------------------------------------------
+   Reduced motion — accessibility. Neutralize keyframe animations and
+   collapse transition/animation durations so users who ask for less
+   motion get a static, settled UI (Svelte fly/fade transitions rely on
+   these durations too). The 3D hero handles its own static frame in JS.
+   ---------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+		scroll-behavior: auto !important;
+	}
+
+	/* Settle elements that animate in from a shifted/transparent start so
+	   they land in their final, visible state rather than mid-keyframe. */
+	.anim-fade-up {
+		animation: none !important;
+		opacity: 1 !important;
+		transform: none !important;
+	}
+
+	.shimmer-bg {
+		animation: none !important;
+	}
 }
 
 /* ----------------------------------------------------------------------
