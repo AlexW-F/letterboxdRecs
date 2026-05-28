@@ -2,7 +2,7 @@
 	import '../app.css';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { Film, Users, User, BookOpen } from 'lucide-svelte';
+	import { Film, BookOpen } from 'lucide-svelte';
 	import { getHealth, type Health } from '$lib/api';
 
 	let { children } = $props();
@@ -20,8 +20,6 @@
 	});
 
 	const links = [
-		{ href: '/', label: 'Group', icon: Users },
-		{ href: '/me', label: 'Solo', icon: User },
 		{ href: '/about', label: 'About', icon: BookOpen }
 	];
 </script>
