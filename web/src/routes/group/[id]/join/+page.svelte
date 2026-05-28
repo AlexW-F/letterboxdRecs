@@ -22,8 +22,10 @@
 		joinGroup,
 		uploadLetterboxd,
 		uploadLetterboxdUsername,
-		type GroupState
+		type GroupState,
+		type UploadResult
 	} from '$lib/api';
+	import { addMember } from '$lib/store';
 
 	const groupId = $derived(page.params.id);
 	let group = $state<GroupState | null>(null);
@@ -90,13 +92,14 @@
 
 		uploading = true;
 		try {
+			let upload: UploadResult;
 			if (mode === 'username') {
 				const u = username.trim().replace(/^@/, '');
 				if (!u) {
 					error = 'Enter a Letterboxd username.';
 					return;
 				}
-				const upload = await uploadLetterboxdUsername(u);
+				upload = await uploadLetterboxdUsername(u);
 				uploadHash = upload.hash;
 				memberName = memberName || u;
 			} else {
@@ -108,11 +111,13 @@
 					error = 'Drop in a ratings.csv from your Letterboxd export.';
 					return;
 				}
-				const upload = await uploadLetterboxd(ratingsFile, watchedFile, watchlistFile);
+				upload = await uploadLetterboxd(ratingsFile, watchedFile, watchlistFile);
 				uploadHash = upload.hash;
 			}
 			const updated = await joinGroup(groupId, { name: memberName, hash: uploadHash });
 			group = updated;
+			// Persist this member to the device store so /explore + /group/* can use them.
+			addMember({ name: memberName, hash: uploadHash, upload });
 			name = '';
 			username = '';
 			ratingsFile = null;

@@ -26,6 +26,16 @@ export function saveMembers(members: Member[]): void {
 	sessionStorage.setItem(KEY, JSON.stringify(members));
 }
 
+/**
+ * Insert or update a member by hash. Used by upload sites (solo + group join)
+ * so /explore and /group/* can find the device's known uploads.
+ */
+export function addMember(member: Member): void {
+	const existing = loadMembers().filter((m) => m.hash !== member.hash);
+	existing.push(member);
+	saveMembers(existing);
+}
+
 export function clearMembers(): void {
 	if (typeof window === 'undefined') return;
 	sessionStorage.removeItem(KEY);
