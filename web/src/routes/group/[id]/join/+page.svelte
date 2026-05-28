@@ -31,7 +31,7 @@
 	let group = $state<GroupState | null>(null);
 	let loadErr = $state<string | null>(null);
 
-	let mode = $state<'username' | 'csv'>('username');
+	let mode = $state<'username' | 'csv'>('csv');
 	let name = $state('');
 	let username = $state('');
 	let ratingsFile = $state<File | null>(null);
