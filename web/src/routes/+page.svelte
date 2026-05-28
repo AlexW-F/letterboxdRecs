@@ -23,8 +23,8 @@
 		// deviceMemory is non-standard (Chromium-only); treat absent as mid-range.
 		const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4;
 
-		if (w < 640 || cores <= 4 || mem <= 4) return 1500;
-		if (w < 1024 || cores <= 6 || mem <= 6) return 2500;
+		if (w < 640 || cores <= 4 || mem <= 4) return 2500;
+		if (w < 1024 || cores <= 6 || mem <= 6) return 3000;
 		return 3500;
 	}
 
