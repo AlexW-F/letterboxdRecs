@@ -49,8 +49,9 @@ class GroupRecOut(BaseModel):
 class UploadOut(BaseModel):
     hash: str
     n_ratings_in: int
-    n_ratings_mapped: int
-    n_with_tmdb: int
+    n_ratings_mapped: int            # total mapped to ml-32m = n_local_matched + n_with_tmdb
+    n_with_tmdb: int                 # mapped via a TMDB id (column or server-side search)
+    n_local_matched: int = 0         # mapped keylessly via local (title, year) match
     n_watchlist: int = 0
     source: str = "csv"               # "csv" or "letterboxd_rss"
     letterboxd_username: Optional[str] = None

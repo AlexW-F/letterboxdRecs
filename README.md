@@ -65,7 +65,7 @@ OpenAPI docs at `http://localhost:8000/docs`.
 | `GET /health` | service + model-loaded status |
 | `GET /modes` | the five recommendation modes (`balanced`, `niche`, `popular`, `serendipitous`, `calibrated`) with weight breakdown |
 | `GET /strategies` | the six group strategies including `group_taste_vector` |
-| `POST /upload-letterboxd` | upload `ratings.csv` (+ optional `watched.csv`, `watchlist.csv`). Returns a SHA-256 content hash that doubles as a session id. |
+| `POST /upload-letterboxd` | upload `ratings.csv` (+ optional `watched.csv`, `watchlist.csv`). A raw export maps to the catalog via local title+year matching — no TMDB key required; a configured key only adds a TMDB-search fallback for titles not found locally. Returns a SHA-256 content hash that doubles as a session id. |
 | `POST /upload-letterboxd-username` | RSS-based ingest: `{username}` → the most-recent ~50 ratings, TMDB IDs included inline |
 | `POST /recommend/individual` | `{hash, mode, top_n}` → top-N with per-rec breakdown |
 | `POST /recommend/group` | `{hashes, member_names?, strategy, mode, top_n, exclude_seen_by_any?}` — `exclude_seen_by_any` powers the strict "Nobody's seen" tab |

@@ -20,6 +20,7 @@ from ..content_features import ContentFeatures
 from ..evaluation import build_genre_features
 from ..group_reranker import GROUP_STRATEGIES, GroupReranker
 from ..reranking import ALSScorer, MODE_WEIGHTS, PopularityModel, Reranker, SVDScorer
+from ..title_matching import LocalTitleIndex, build_local_title_index
 from ..viz import MovieSpaceIndex
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 @dataclass
 class ModelState:
     movies_df: pd.DataFrame
-    links_df: pd.DataFrame  # normalized TMDB→movieId table for upload-time enrichment
+    # Upload-time resolution of a user's films to ml-32m movieIds:
+    #   tmdb_to_movie — authoritative TMDB id → movieId (from links.csv)
+    #   title_index   — keyless (title, year) → movieId match against the catalog
+    tmdb_to_movie: dict
+    title_index: LocalTitleIndex
     title_of: dict
     popularity: PopularityModel
     genre_features: dict
@@ -91,7 +96,8 @@ def load_state() -> ModelState:
         for mid, title in zip(movies_df["movieId"].astype(str), movies_df["title"])
     }
 
-    # Pre-normalized links table for upload-time TMDB→movieId joins.
+    # Authoritative TMDB id → movieId table for upload-time joins. Built from
+    # links.csv and kept as a plain dict for O(1) per-row resolution.
     links_df = pd.read_csv(ml_dir / "links.csv")
     links_df["tmdbId"] = pd.to_numeric(links_df["tmdbId"], errors="coerce")
     links_df = links_df.dropna(subset=["tmdbId"]).copy()
@@ -99,6 +105,16 @@ def load_state() -> ModelState:
     links_df["movieId"] = links_df["movieId"].astype(str)
     # Dedup so a single tmdbId can't fan a rating out to multiple movieIds.
     links_df = links_df.drop_duplicates(subset="tmdbId")
+    tmdb_to_movie = dict(zip(links_df["tmdbId"], links_df["movieId"]))
+
+    # Keyless fallback: match a user's (title, year) directly against the
+    # catalog so raw Letterboxd CSVs (no tmdb_id column) map without a
+    # TMDB_API_KEY. Built once from the titles already in movies_df.
+    title_index = build_local_title_index(
+        zip(movies_df["movieId"].astype(str), movies_df["title"].astype(str))
+    )
+    logger.info("built local title index: %d normalized titles from %d movies",
+                title_index.n_titles, len(movies_df))
 
     content = None
     if content_path.with_suffix(".npz").exists():
@@ -170,14 +186,16 @@ def load_state() -> ModelState:
     # TMDB key for server-side enrichment of raw Letterboxd uploads. Env only.
     tmdb_key = os.getenv("TMDB_API_KEY")
     if not tmdb_key:
-        logger.warning("no TMDB_API_KEY available — uploads of raw Letterboxd CSVs "
-                       "(without a tmdb_id column) will be rejected")
+        logger.info("no TMDB_API_KEY set — raw Letterboxd CSVs map via local "
+                    "title+year matching against the catalog; titles not found "
+                    "locally won't be enriched via TMDB search")
 
     logger.info("API ready: %d movies, %d users in cache",
                 len(movies_df), len(cache))
     return ModelState(
         movies_df=movies_df,
-        links_df=links_df,
+        tmdb_to_movie=tmdb_to_movie,
+        title_index=title_index,
         title_of=title_of,
         popularity=popularity,
         genre_features=genre_features,

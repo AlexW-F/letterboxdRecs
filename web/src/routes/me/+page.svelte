@@ -21,7 +21,12 @@
 	let ratingsFile = $state<File | null>(null);
 	let watchedFile = $state<File | null>(null);
 	let hash = $state<string | null>(null);
-	let uploadInfo = $state<{ in: number; mapped: number; with_tmdb: number } | null>(null);
+	let uploadInfo = $state<{
+		in: number;
+		mapped: number;
+		with_tmdb: number;
+		local: number;
+	} | null>(null);
 
 	let busy = $state(false);
 	let error = $state<string | null>(null);
@@ -44,7 +49,12 @@
 			if (!hash) {
 				const u = await uploadLetterboxd(ratingsFile, watchedFile);
 				hash = u.hash;
-				uploadInfo = { in: u.n_ratings_in, mapped: u.n_ratings_mapped, with_tmdb: u.n_with_tmdb };
+				uploadInfo = {
+					in: u.n_ratings_in,
+					mapped: u.n_ratings_mapped,
+					with_tmdb: u.n_with_tmdb,
+					local: u.n_local_matched ?? 0
+				};
 				// Persist so /explore + /group/* can find this device's upload.
 				addMember({ name: u.letterboxd_username ?? 'you', hash: u.hash, upload: u });
 			}
@@ -168,7 +178,8 @@
 			</button>
 			{#if busy}
 				<p class="text-xs" style="color: var(--ink-dim);">
-					~15s for the first TMDB enrichment of ~250 ratings. Instant on re-upload.
+					Titles are matched against the catalog instantly. Anything not found
+					locally is looked up on TMDB (a few seconds on first upload).
 				</p>
 			{/if}
 		</div>
@@ -177,7 +188,11 @@
 			<Stat
 				label="ratings uploaded"
 				value={uploadInfo?.in ?? '—'}
-				hint={uploadInfo ? `${uploadInfo.with_tmdb} had TMDB IDs` : ''}
+				hint={uploadInfo
+					? uploadInfo.local > 0
+						? `${uploadInfo.local} by title · ${uploadInfo.with_tmdb} via TMDB`
+						: `${uploadInfo.with_tmdb} had TMDB IDs`
+					: ''}
 			/>
 			<Stat
 				label="mapped to ml-32m"

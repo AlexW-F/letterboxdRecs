@@ -12,8 +12,8 @@ Each ``<item>`` in the RSS gives us:
 - ``<letterboxd:rewatch>`` — Yes/No (we don't filter rewatches today)
 
 We map RSS entries to the same in-memory representation that
-``_ratings_csv_to_movielens`` produces for CSV uploads, so the rest of
-the pipeline is unchanged.
+``upload_mapping.ratings_csv_to_movielens`` produces for CSV uploads, so
+the rest of the pipeline is unchanged.
 """
 
 from __future__ import annotations
@@ -144,7 +144,7 @@ def parse_rss(xml_bytes: bytes) -> Tuple[List[Dict], Set[int]]:
 
 def synthesize_ratings_csv(rated: List[Dict]) -> bytes:
     """Build a CSV identical in shape to a Letterboxd ratings export so it
-    can be fed to the existing ``_ratings_csv_to_movielens`` pipeline.
+    can be fed to the existing ``ratings_csv_to_movielens`` pipeline.
 
     Sort by tmdb_id so the same RSS content always produces the same bytes
     (and therefore the same content-hash → same cache entry)."""
