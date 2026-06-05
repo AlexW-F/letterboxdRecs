@@ -36,6 +36,7 @@ export interface UploadResult {
 	n_ratings_in: number;
 	n_ratings_mapped: number;
 	n_with_tmdb: number;
+	n_local_matched?: number;
 	n_watchlist: number;
 	source?: 'csv' | 'letterboxd_rss';
 	letterboxd_username?: string | null;
