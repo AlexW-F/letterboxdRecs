@@ -30,6 +30,25 @@
 
 	const heroPoints = computeHeroPoints();
 
+	const infoCards: { title: string; body: string; tint: string; href?: string }[] = [
+		{
+			title: 'Six aggregation strategies',
+			body: 'average · least_misery · most_pleasure · consensus · hybrid · and our group_taste_vector that fuses everyone into a super-user.',
+			tint: 'chip-violet'
+		},
+		{
+			title: 'Three content scorers',
+			body: 'Tag Genome 2021 (1,084 curated tags) · TMDB plot sentence-embeddings · IMDb director one-hots. Per-scorer weights tunable.',
+			tint: 'chip-brand'
+		},
+		{
+			title: 'Personal 3D in /explore',
+			body: 'Your folded-in taste vector projected into the same UMAP space, with your rated films visible around you.',
+			tint: 'chip-accent',
+			href: '/explore'
+		}
+	];
+
 	async function createShareableGroup() {
 		error = null;
 		creatingGroup = true;
@@ -139,25 +158,11 @@
 		class="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3"
 		style="z-index: 1;"
 	>
-		{#each [
-			{
-				title: 'Six aggregation strategies',
-				body: 'average · least_misery · most_pleasure · consensus · hybrid · and our group_taste_vector that fuses everyone into a super-user.',
-				tint: 'chip-violet'
-			},
-			{
-				title: 'Three content scorers',
-				body: 'Tag Genome 2021 (1,084 curated tags) · TMDB plot sentence-embeddings · IMDb director one-hots. Per-scorer weights tunable.',
-				tint: 'chip-brand'
-			},
-			{
-				title: 'Personal 3D in /explore',
-				body: 'Your folded-in taste vector projected into the same UMAP space, with your rated films visible around you.',
-				tint: 'chip-accent'
-			}
-		] as item, i (item.title)}
-			<div
-				class="surface p-4 card-hover anim-fade-up"
+		{#each infoCards as item, i (item.title)}
+			<svelte:element
+				this={item.href ? 'a' : 'div'}
+				href={item.href}
+				class="surface p-4 card-hover anim-fade-up block"
 				style="
 					background: rgba(10, 12, 16, 0.65);
 					backdrop-filter: blur(12px);
@@ -168,7 +173,10 @@
 			>
 				<span class="chip {item.tint}">{item.title}</span>
 				<p class="text-sm mt-3" style="color: var(--ink-muted); line-height: 1.5;">{item.body}</p>
-			</div>
+				{#if item.href}
+					<p class="text-xs mt-2" style="color: var(--brand);">take a look →</p>
+				{/if}
+			</svelte:element>
 		{/each}
 	</div>
 </section>

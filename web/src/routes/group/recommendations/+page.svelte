@@ -151,6 +151,7 @@
 	let argueResult = $state<GroupRecResponse | null>(null);
 	let seenResult = $state<GroupRecResponse | null>(null);
 	let watchlistResult = $state<WatchlistOverlapResponse | null>(null);
+	let watchlistExpanded = $state(false);
 	let view = $state<'top' | 'argue' | 'seen'>('top');
 
 	const activeResult = $derived(
@@ -159,10 +160,13 @@
 	const membersWithWatchlist = $derived(members.filter((m) => (m.upload?.n_watchlist ?? 0) > 0));
 
 	$effect(() => {
-		Promise.all([getModes(), getStrategies()]).then(([m, s]) => {
-			modes = m.modes;
-			strategies = s.strategies;
-		});
+		Promise.all([getModes(), getStrategies()])
+			.then(([m, s]) => {
+				modes = m.modes;
+				strategies = s.strategies;
+			})
+			// API down: run() surfaces the real error; selectors just stay empty.
+			.catch(() => {});
 	});
 
 	async function run() {
@@ -380,7 +384,7 @@
 				</div>
 
 				<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-					{#each watchlistResult.items.slice(0, 12) as it (it.movie_id)}
+					{#each watchlistExpanded ? watchlistResult.items : watchlistResult.items.slice(0, 12) as it (it.movie_id)}
 						{@const titleClean = it.title.replace(/\s*\((19|20)\d{2}\)\s*$/, '')}
 						{@const yearMatch = it.title.match(/\((19|20)\d{2}\)\s*$/)}
 						<div
@@ -410,6 +414,17 @@
 						</div>
 					{/each}
 				</div>
+
+				{#if watchlistResult.items.length > 12}
+					<div class="flex justify-center pt-1">
+						<button
+							class="btn btn-ghost btn-pill text-xs"
+							onclick={() => (watchlistExpanded = !watchlistExpanded)}
+						>
+							{watchlistExpanded ? 'show fewer' : `show all ${watchlistResult.items.length}`}
+						</button>
+					</div>
+				{/if}
 			</section>
 		{:else if membersWithWatchlist.length < 2 && topResult}
 			<p class="text-xs px-1" style="color: var(--ink-faint);">

@@ -1,5 +1,8 @@
-// In-memory + sessionStorage store for uploaded members so navigating
-// between pages doesn't drop their hashes.
+// localStorage store for uploaded members so /explore and /group/* can find
+// this device's uploads. Persisted across tabs/sessions (a movie night can
+// easily outlive a mobile tab); only display names + content hashes are
+// stored, never ratings. Reads fall back to the legacy sessionStorage key
+// so in-flight tabs from before the switch keep their members.
 
 import type { UploadResult } from './api';
 
@@ -14,7 +17,7 @@ const KEY = 'lbrecs.members';
 export function loadMembers(): Member[] {
 	if (typeof window === 'undefined') return [];
 	try {
-		const raw = sessionStorage.getItem(KEY);
+		const raw = localStorage.getItem(KEY) ?? sessionStorage.getItem(KEY);
 		return raw ? (JSON.parse(raw) as Member[]) : [];
 	} catch {
 		return [];
@@ -23,7 +26,12 @@ export function loadMembers(): Member[] {
 
 export function saveMembers(members: Member[]): void {
 	if (typeof window === 'undefined') return;
-	sessionStorage.setItem(KEY, JSON.stringify(members));
+	try {
+		localStorage.setItem(KEY, JSON.stringify(members));
+		sessionStorage.removeItem(KEY);
+	} catch {
+		/* storage blocked or full — non-fatal, members just won't persist */
+	}
 }
 
 /**
@@ -38,5 +46,10 @@ export function addMember(member: Member): void {
 
 export function clearMembers(): void {
 	if (typeof window === 'undefined') return;
-	sessionStorage.removeItem(KEY);
+	try {
+		localStorage.removeItem(KEY);
+		sessionStorage.removeItem(KEY);
+	} catch {
+		/* ignore */
+	}
 }
