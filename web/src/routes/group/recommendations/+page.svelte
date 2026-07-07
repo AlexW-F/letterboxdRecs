@@ -74,10 +74,14 @@
 		if (voterKey && voterName) localStorage.setItem(voterKey, voterName);
 	});
 
-	// Default voter to first member once the group loads (if nothing saved yet)
+	// Default voter once the group loads (if nothing saved yet): prefer the
+	// member whose upload lives on this device — defaulting to members[0]
+	// would cast votes as whoever joined first, not the person holding the phone.
 	$effect(() => {
 		if (!voterName && serverGroup && serverGroup.members.length > 0) {
-			voterName = serverGroup.members[0].name;
+			const localHashes = new Set(localMembers.map((m) => m.hash));
+			const mine = serverGroup.members.find((m) => localHashes.has(m.hash));
+			voterName = (mine ?? serverGroup.members[0]).name;
 		}
 	});
 
@@ -138,6 +142,11 @@
 
 	let busy = $state(false);
 	let error = $state<string | null>(null);
+	// Params of the last computed run — used to flag stale results when the
+	// user changes strategy/mode but hasn't hit recompute yet.
+	let lastRunKey = $state<string | null>(null);
+	const paramsKey = $derived(`${strategy}|${mode}|${topN}`);
+	const stale = $derived(lastRunKey !== null && lastRunKey !== paramsKey && !busy);
 	let topResult = $state<GroupRecResponse | null>(null);
 	let argueResult = $state<GroupRecResponse | null>(null);
 	let seenResult = $state<GroupRecResponse | null>(null);
@@ -163,6 +172,7 @@
 			return;
 		}
 		busy = true;
+		lastRunKey = paramsKey;
 		const payload = {
 			hashes: members.map((m) => m.hash),
 			member_names: members.map((m) => m.name),
@@ -212,12 +222,16 @@
 	);
 </script>
 
+<svelte:head>
+	<title>Group picks · movienight</title>
+</svelte:head>
+
 <section class="space-y-6 anim-fade-up">
 	<header class="flex items-end justify-between flex-wrap gap-3">
 		<div>
 			<span class="chip chip-violet">
 				<UsersIcon size={11} />
-				Group · {members.length} members · {strategy}
+				Group · {members.length} members · {strategy.replace(/_/g, ' ')}
 			</span>
 			<h1 class="display-md mt-2" style="font-family: 'Playfair Display', Georgia, serif; font-style: italic;">
 				Picks <span class="text-gradient">your group</span> will love.
@@ -241,7 +255,10 @@
 				<BarChart3 size={13} />
 				compatibility
 			</a>
-			<button class="btn btn-ghost btn-pill text-xs" onclick={() => goto('/')}>
+			<button
+				class="btn btn-ghost btn-pill text-xs"
+				onclick={() => goto(groupId ? `/group/${groupId}/join` : '/')}
+			>
 				<ArrowLeft size={13} />
 				add more
 			</button>
@@ -318,7 +335,17 @@
 						style="width: 5rem; padding: 0.3rem 0.5rem;"
 					/>
 				</label>
-				<button class="ml-auto btn btn-secondary" onclick={run} disabled={busy}>
+				{#if stale}
+					<span class="text-[11px] ml-auto" style="color: #fde68a;">
+						settings changed — results below are from the previous run
+					</span>
+				{/if}
+				<button
+					class="btn btn-secondary {stale ? '' : 'ml-auto'}"
+					style={stale ? 'box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.45);' : ''}
+					onclick={run}
+					disabled={busy}
+				>
 					{#if busy}
 						<Loader2 size={14} class="animate-spin" />
 						computing
@@ -406,7 +433,7 @@
 		{/if}
 
 		{#if topResult}
-			<div class="flex items-center gap-1 text-sm" role="tablist">
+			<div class="flex flex-wrap items-center gap-1 text-sm" role="tablist">
 				<button
 					class="btn btn-pill text-xs {view === 'top' ? 'btn-secondary' : 'btn-ghost'}"
 					role="tab"

@@ -33,6 +33,10 @@
 	});
 </script>
 
+<svelte:head>
+	<title>Your taste in 3D · movienight</title>
+</svelte:head>
+
 <section class="space-y-4 anim-fade-up">
 	<header>
 		<span class="chip chip-accent">
@@ -108,7 +112,10 @@
 			</div>
 		{/if}
 		{#if error}
-			<div class="p-4 text-sm" style="color: #fca5a5;">{error}</div>
+			<div class="p-4 text-sm" style="color: #fca5a5;">
+				Couldn't project <em>{selectedLabel}</em>: {error}
+				<span style="color: var(--ink-faint);">— showing the demo projection instead.</span>
+			</div>
 		{/if}
 		{#if personalizedHTML && !error}
 			<iframe
@@ -117,7 +124,7 @@
 				class="w-full block"
 				style="height: 80vh; border: 0; background: #0a0c10;"
 			></iframe>
-		{:else if !loading && !error}
+		{:else if !loading}
 			<iframe
 				src="/movie_space.html"
 				title="3D movie space (demo)"
@@ -128,7 +135,7 @@
 	</div>
 
 	<p class="text-xs" style="color: var(--ink-faint);">
-		Background is 8,000 films with ≥100 ratings. Cached server-side per upload — first load takes
-		~3s, subsequent loads are instant.
+		Background is 8,000 films with ≥100 ratings. Cached server-side per upload — the first
+		projection can take up to a minute on a cold server; repeat loads are instant.
 	</p>
 </section>

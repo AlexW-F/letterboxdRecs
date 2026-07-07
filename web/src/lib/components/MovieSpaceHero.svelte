@@ -55,7 +55,14 @@
 			return;
 		}
 
-		const THREE = await import('three');
+		let THREE: typeof import('three');
+		try {
+			THREE = await import('three');
+		} catch {
+			error = '3D view unavailable on this device';
+			loading = false;
+			return;
+		}
 
 		// The galactic-web (k-NN lines) is an O(n²) build done synchronously at
 		// mount — it stalls low-power phones. Skip it on small screens / sparse
@@ -66,11 +73,21 @@
 		// ---------------------------------------------------------------
 		// Scene + renderer
 		// ---------------------------------------------------------------
-		const renderer = new THREE.WebGLRenderer({
-			alpha: true,
-			antialias: true,
-			powerPreference: 'high-performance'
-		});
+		// Context creation throws where WebGL is disabled/unsupported — fall
+		// back to the error state instead of spinning on "weaving the cloud…"
+		// forever.
+		let renderer: import('three').WebGLRenderer;
+		try {
+			renderer = new THREE.WebGLRenderer({
+				alpha: true,
+				antialias: true,
+				powerPreference: 'high-performance'
+			});
+		} catch {
+			error = '3D view unavailable on this device';
+			loading = false;
+			return;
+		}
 		renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 		renderer.setSize(container.clientWidth, container.clientHeight, false);
 		renderer.setClearColor(0x000000, 0);

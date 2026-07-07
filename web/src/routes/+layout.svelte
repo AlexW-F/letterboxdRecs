@@ -7,7 +7,8 @@
 
 	let { children } = $props();
 
-	let health = $state<Health | null>(null);
+	// undefined = first check still in flight, null = unreachable
+	let health = $state<Health | null | undefined>(undefined);
 
 	onMount(() => {
 		const refresh = () =>
@@ -27,7 +28,7 @@
 <svelte:head>
 	<title>movienight · group movie recommender</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	<link
 		rel="stylesheet"
 		href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&display=swap"
@@ -64,6 +65,7 @@
 					<a
 						href={l.href}
 						class="px-3 py-1.5 rounded-md transition flex items-center gap-1.5"
+						aria-current={active ? 'page' : undefined}
 						style={active
 							? 'background: var(--surface-strong); color: var(--ink); border: 1px solid var(--border-strong);'
 							: 'color: var(--ink-muted); border: 1px solid transparent;'}
@@ -86,6 +88,14 @@
 							{#if health.movie_space_loaded}· 3D viz{/if}
 						</span>
 						<span class="md:hidden">ok</span>
+					</span>
+				{:else if health === undefined}
+					<span class="flex items-center gap-1.5">
+						<span
+							class="inline-block w-1.5 h-1.5 rounded-full animate-pulse"
+							style="background: rgba(245, 247, 250, 0.35);"
+						></span>
+						<span>connecting…</span>
 					</span>
 				{:else}
 					<span class="flex items-center gap-1.5">
@@ -126,6 +136,7 @@
 				<a
 					href={l.href}
 					class="px-3 py-1.5 rounded-md text-xs flex items-center gap-1 whitespace-nowrap"
+					aria-current={active ? 'page' : undefined}
 					style={active
 						? 'background: var(--surface-strong); color: var(--ink);'
 						: 'color: var(--ink-muted);'}

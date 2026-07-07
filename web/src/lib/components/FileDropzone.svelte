@@ -34,7 +34,7 @@
 </script>
 
 <label
-	class="block rounded-lg border-2 border-dashed cursor-pointer transition px-4 py-5 text-center relative overflow-hidden"
+	class="dropzone block rounded-lg border-2 border-dashed cursor-pointer transition px-4 py-5 text-center relative overflow-hidden"
 	style={file
 		? 'background: var(--brand-dim); border-color: rgba(52,211,153,0.55);'
 		: dragging
@@ -65,5 +65,14 @@
 			{hint || 'drop a CSV or click to choose'}
 		</div>
 	{/if}
-	<input type="file" {accept} class="hidden" onchange={onChange} />
+	<!-- sr-only (not display:none) keeps the input tabbable, so keyboard
+	     users can reach the picker; the ring renders on the label. -->
+	<input type="file" {accept} class="sr-only" onchange={onChange} />
 </label>
+
+<style>
+	.dropzone:focus-within {
+		outline: 2px solid rgba(52, 211, 153, 0.7);
+		outline-offset: 2px;
+	}
+</style>

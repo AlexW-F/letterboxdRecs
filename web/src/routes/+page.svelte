@@ -80,7 +80,7 @@
 		>
 			<span class="chip chip-accent" style="pointer-events: auto;">
 				<Sparkles size={11} />
-				5,000 films · drifting through ALS latent space
+				{heroPoints.toLocaleString()} films · drifting through ALS latent space
 			</span>
 			<h1
 				class="display-xl text-balance mx-auto"

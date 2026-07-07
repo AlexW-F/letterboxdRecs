@@ -82,6 +82,10 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Compatibility · movienight</title>
+</svelte:head>
+
 <section class="space-y-6 anim-fade-up">
 	<header class="flex items-end justify-between flex-wrap gap-3">
 		<div>
