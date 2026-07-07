@@ -252,6 +252,7 @@
 			<button
 				class="mt-2 text-xs hover:underline inline-flex items-center gap-1"
 				style="color: var(--ink-dim);"
+				aria-expanded={expanded}
 				onclick={() => (expanded = !expanded)}
 			>
 				<ChevronDown
@@ -329,6 +330,7 @@
 					style={myVote === 'up'
 						? 'background: rgba(110, 231, 183, 0.18); border: 1px solid rgba(110, 231, 183, 0.55); color: #6ee7b7;'
 						: 'background: var(--surface); border: 1px solid var(--border); color: var(--ink-muted);'}
+					aria-pressed={myVote === 'up'}
 					onclick={() => clickVote('up')}
 					title="Vote up as {voterName}"
 				>
@@ -341,6 +343,7 @@
 					style={myVote === 'veto'
 						? 'background: rgba(248, 113, 113, 0.16); border: 1px solid rgba(248, 113, 113, 0.5); color: #fca5a5;'
 						: 'background: var(--surface); border: 1px solid var(--border); color: var(--ink-muted);'}
+					aria-pressed={myVote === 'veto'}
 					onclick={() => clickVote('veto')}
 					title="Veto as {voterName}"
 				>

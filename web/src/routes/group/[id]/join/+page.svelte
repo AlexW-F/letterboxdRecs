@@ -27,7 +27,9 @@
 	} from '$lib/api';
 	import { addMember } from '$lib/store';
 
-	const groupId = $derived(page.params.id);
+	// The route guarantees an id; `?? ''` narrows the type so downstream
+	// callers (joinGroup, encodeURIComponent) take it as a plain string.
+	const groupId = $derived(page.params.id ?? '');
 	let group = $state<GroupState | null>(null);
 	let loadErr = $state<string | null>(null);
 
@@ -40,6 +42,9 @@
 	let uploading = $state(false);
 	let error = $state<string | null>(null);
 	let copied = $state(false);
+	// Name of the member added from this device — powers the "you're in"
+	// confirmation so joining doesn't end on a silently-reset form.
+	let joinedAs = $state<string | null>(null);
 
 	const shareUrl = $derived(
 		typeof window !== 'undefined' && groupId ? `${window.location.origin}/group/${groupId}/join` : ''
@@ -118,6 +123,7 @@
 			group = updated;
 			// Persist this member to the device store so /explore + /group/* can use them.
 			addMember({ name: memberName, hash: uploadHash, upload });
+			joinedAs = memberName;
 			name = '';
 			username = '';
 			ratingsFile = null;
@@ -130,6 +136,10 @@
 		}
 	}
 </script>
+
+<svelte:head>
+	<title>Join the group · movienight</title>
+</svelte:head>
 
 <section class="space-y-6 anim-fade-up max-w-3xl mx-auto">
 	<header class="space-y-2">
@@ -227,16 +237,47 @@
 			{/if}
 		</div>
 
+		<!-- Joined confirmation -->
+		{#if joinedAs}
+			<div
+				class="surface p-4 flex items-center gap-3 flex-wrap anim-fade-up"
+				style="background: var(--brand-dim); border-color: rgba(52, 211, 153, 0.4);"
+			>
+				<CheckCircle2 size={18} style="color: #6ee7b7; flex-shrink: 0;" />
+				<div class="flex-1 min-w-0 text-sm">
+					<strong>You're in as {joinedAs}.</strong>
+					{#if group.members.length >= 2}
+						<span style="color: var(--ink-muted);">The group's ready when you are.</span>
+					{:else}
+						<span style="color: var(--ink-muted);">
+							Share the link above — group recs unlock at 2 members.
+						</span>
+					{/if}
+				</div>
+				{#if group.members.length >= 2}
+					<button
+						class="btn btn-primary"
+						onclick={() => goto(`/group/recommendations?group=${encodeURIComponent(groupId)}`)}
+					>
+						See group recs
+						<ArrowRight size={14} />
+					</button>
+				{/if}
+			</div>
+		{/if}
+
 		<!-- Add-me form -->
 		<div class="surface p-5 space-y-4">
 			<div class="flex items-center gap-2">
 				<UserPlus size={16} style="color: var(--brand);" />
-				<h2 class="text-base font-medium">Add yourself</h2>
+				<h2 class="text-base font-medium">{joinedAs ? 'Add someone else' : 'Add yourself'}</h2>
 			</div>
 
-			<div class="flex items-center gap-1 text-sm flex-wrap" role="tablist">
+			<div class="flex items-center gap-1 text-sm flex-wrap" role="radiogroup" aria-label="How to add your ratings">
 				<button
 					type="button"
+					role="radio"
+					aria-checked={mode === 'csv'}
 					class="btn btn-pill text-xs {mode === 'csv' ? 'btn-secondary' : 'btn-ghost'}"
 					onclick={() => (mode = 'csv')}
 					disabled={uploading}
@@ -247,6 +288,8 @@
 				</button>
 				<button
 					type="button"
+					role="radio"
+					aria-checked={mode === 'username'}
 					class="btn btn-pill text-xs {mode === 'username' ? 'btn-secondary' : 'btn-ghost'}"
 					onclick={() => (mode = 'username')}
 					disabled={uploading}
@@ -343,7 +386,7 @@
 					{mode === 'username' ? 'Fetching from Letterboxd…' : 'Uploading + enriching…'}
 				{:else}
 					<UserPlus size={14} />
-					Add me to the group
+					{joinedAs ? 'Add to the group' : 'Add me to the group'}
 				{/if}
 			</button>
 		</div>

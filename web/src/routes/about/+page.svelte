@@ -33,6 +33,10 @@
 	];
 </script>
 
+<svelte:head>
+	<title>About · movienight</title>
+</svelte:head>
+
 <section class="space-y-8 max-w-4xl anim-fade-up">
 	<header>
 		<span class="chip">about · methodology</span>

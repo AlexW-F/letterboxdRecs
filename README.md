@@ -136,7 +136,7 @@ Reports land in `evaluation_results/phase3_at_scale_v2.md`.
 - `src.letterboxd_rss` — username → recent rated films via the public RSS feed (HTML is Cloudflare-gated)
 - `src.viz` — 3D UMAP renderer for the explore page
 - `src.api` — FastAPI app + state singleton + routers (recommendations, groups, explore, meta)
-- `web/` — SvelteKit frontend, Tailwind, vanilla DM Serif Display for headers / Inter for body
+- `web/` — SvelteKit frontend, Tailwind, Playfair Display for headers / Inter for body
 
 ## Datasets + credits
 

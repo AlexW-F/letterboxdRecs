@@ -99,8 +99,13 @@
 		result = null;
 		ratingsFile = null;
 		watchedFile = null;
+		error = null;
 	}
 </script>
+
+<svelte:head>
+	<title>Solo recs · movienight</title>
+</svelte:head>
 
 <section class="space-y-6 anim-fade-up">
 	<header class="flex items-end justify-between flex-wrap gap-3">

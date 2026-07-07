@@ -19,7 +19,7 @@
 	--ink: #f5f7fa;
 	--ink-muted: rgba(245, 247, 250, 0.65);
 	--ink-dim: rgba(245, 247, 250, 0.6);
-	--ink-faint: rgba(245, 247, 250, 0.42);
+	--ink-faint: rgba(245, 247, 250, 0.5);
 
 	/* Brand */
 	--brand: #34d399; /* emerald — primary action */
@@ -61,6 +61,13 @@ body {
 ::selection {
 	background: var(--brand-dim);
 	color: var(--ink);
+}
+
+/* Keyboard focus — visible ring on anything reachable by Tab. Inputs keep
+   their own border treatment (.input:focus overrides with outline: none). */
+:focus-visible {
+	outline: 2px solid rgba(52, 211, 153, 0.7);
+	outline-offset: 2px;
 }
 
 /* ----------------------------------------------------------------------
