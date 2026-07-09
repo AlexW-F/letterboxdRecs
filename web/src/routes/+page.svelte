@@ -25,25 +25,6 @@
 
 	const heroPoints = computeHeroPoints();
 
-	const infoCards: { title: string; body: string; tint: string; href?: string }[] = [
-		{
-			title: 'Six ways to agree',
-			body: 'Fair averages, least-misery, or fuse the whole group into one taste and let the projector decide. Pick the politics that fit your friends.',
-			tint: 'chip-violet'
-		},
-		{
-			title: 'Knows the deep cuts',
-			body: '1,084 hand-curated tags plus plot embeddings under the hood — so the shortlist reaches past the same twenty films everyone recommends.',
-			tint: 'chip-brand'
-		},
-		{
-			title: 'Your taste, in 3D',
-			body: 'The lights behind this page are real films. In the explore room you drift through them with your own ratings lit up around you.',
-			tint: 'chip-rose',
-			href: '/explore'
-		}
-	];
-
 	async function createShareableGroup() {
 		error = null;
 		creatingGroup = true;
@@ -60,10 +41,10 @@
 </script>
 
 <!--
-  Landing page is a galaxy backdrop with content layered on top. The
-  Three.js canvas is fixed full-viewport; content blocks float above
-  with `pointer-events: none` on non-interactive copy so drag-to-spin
-  reaches the canvas through dead space.
+  The cloud is the whole show. Full-viewport Three.js canvas with drag
+  enabled; the copy lives in a poster-style billing block anchored to the
+  bottom of the first viewport. Everything non-interactive is
+  pointer-events: none so dragging works even over the headline.
 -->
 
 <div
@@ -73,50 +54,54 @@
 	<MovieSpaceHero
 		height="100vh"
 		points={heroPoints}
-		enableDrag={false}
-		parallaxStrength={0.25}
+		enableDrag={true}
+		parallaxStrength={0.35}
 	/>
 </div>
 
-<!-- Top scrim so the hero text reads cleanly against the galaxy -->
+<!-- Bottom scrim so the billing block reads cleanly against the cloud -->
 <div
-	class="fixed inset-x-0 top-0 -z-[5] pointer-events-none"
-	style="height: 60vh; background: radial-gradient(ellipse at top center, rgba(27, 26, 23, 0.55) 0%, transparent 70%);"
+	class="fixed inset-x-0 bottom-0 -z-[5] pointer-events-none"
+	style="height: 55vh; background: linear-gradient(180deg, transparent 0%, rgba(23, 22, 19, 0.55) 55%, rgba(20, 19, 16, 0.85) 100%);"
 ></div>
 
 <section class="relative" style="z-index: 1; pointer-events: none;">
+	<!-- Poster billing block: headline bottom-left, actions bottom-right. -->
 	<div
-		class="anim-fade-up min-h-[78vh] flex flex-col items-center justify-center pb-12"
-		style="pointer-events: none;"
+		class="anim-fade-up flex flex-col justify-end"
+		style="min-height: calc(100vh - 190px); pointer-events: none;"
 	>
-		<div
-			class="hero-card relative px-6 sm:px-10 py-7 sm:py-9 text-center space-y-5 max-w-3xl"
-		>
-			<div
-				class="board neon-green"
-				style="font-size: 0.72rem; letter-spacing: 0.42em;"
-			>
-				— open all night —
-			</div>
-			<!-- No per-line scrims here: at Oswald's tight leading the cloned
-			     background strips overlap the previous line's glyphs and paint
-			     over them, ghosting the headline. A soft shadow reads fine. -->
-			<h1 class="display-xl mx-auto" style="text-shadow: 0 2px 26px rgba(10, 9, 7, 0.9), 0 0 60px rgba(10, 9, 7, 0.7);">
-				Movies your whole<br />
-				group <span class="neon-amber">will love</span>
-			</h1>
-			<p
-				class="text-balance max-w-2xl mx-auto"
-				style="color: var(--ink); font-size: 1.05rem; line-height: 1.9;"
-			>
-				<span class="text-scrim">
+		<div class="flex flex-wrap items-end justify-between gap-x-10 gap-y-8 pb-4">
+			<div class="max-w-2xl">
+				<div
+					class="board neon-green"
+					style="font-size: 0.72rem; letter-spacing: 0.42em;"
+				>
+					— open all night —
+				</div>
+				<!-- No per-line scrims here: at Oswald's tight leading the cloned
+				     background strips overlap the previous line's glyphs and paint
+				     over them, ghosting the headline. The scrim gradient + a soft
+				     shadow carry readability instead. -->
+				<h1
+					class="display-xl mt-4"
+					style="text-shadow: 0 2px 26px rgba(10, 9, 7, 0.9), 0 0 60px rgba(10, 9, 7, 0.7);"
+				>
+					Movies your whole<br />
+					group <span class="neon-amber">will love</span>
+				</h1>
+				<p
+					class="mt-4 max-w-xl"
+					style="color: var(--ink-muted); font-size: 1.02rem; line-height: 1.75;"
+				>
 					Everybody tosses in their Letterboxd, the projector does the math, and you argue the
 					shortlist down to one film. Doors at eight.
-				</span>
-			</p>
+				</p>
+			</div>
+
 			<div
-				class="flex flex-col items-center gap-3 pt-1"
-				style="pointer-events: auto;"
+				class="flex flex-col items-start sm:items-end gap-3 pb-1"
+				style="pointer-events: auto; max-width: 23rem;"
 			>
 				<button
 					class="btn btn-primary"
@@ -132,47 +117,26 @@
 						Put tonight on the marquee
 					{/if}
 				</button>
-				<button
-					class="btn btn-ghost text-sm"
-					style="color: var(--ink); opacity: 1;"
-					onclick={() => goto('/me')}
-				>
-					just me →
-				</button>
-				<p class="text-xs mono" style="color: var(--ink-faint);">
-					{heroPoints.toLocaleString()} films floating behind this page · every light is real
+				<div class="flex items-center gap-2">
+					<button
+						class="btn btn-ghost text-sm"
+						style="color: var(--ink); opacity: 1;"
+						onclick={() => goto('/me')}
+					>
+						just me →
+					</button>
+					<a href="/explore" class="btn btn-ghost text-sm" style="color: var(--ink-muted);">
+						wander the cloud →
+					</a>
+				</div>
+				<p class="text-xs mono sm:text-right" style="color: var(--ink-faint);">
+					{heroPoints.toLocaleString()} films floating up there · every light is real ·
+					<span style="color: var(--ink-dim);">drag to look around</span>
 				</p>
 				{#if error}
 					<p class="text-xs" style="color: var(--rust);">{error}</p>
 				{/if}
 			</div>
 		</div>
-	</div>
-
-	<!-- About-the-system row underneath, still over the galaxy -->
-	<div
-		class="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3"
-		style="z-index: 1;"
-	>
-		{#each infoCards as item, i (item.title)}
-			<svelte:element
-				this={item.href ? 'a' : 'div'}
-				href={item.href}
-				class="surface p-4 card-hover anim-fade-up block {i === 0 ? 'tilt-a' : i === 2 ? 'tilt-b' : ''}"
-				style="
-					background: rgba(27, 26, 23, 0.72);
-					backdrop-filter: blur(12px);
-					-webkit-backdrop-filter: blur(12px);
-					animation-delay: {120 + i * 50}ms;
-					pointer-events: auto;
-				"
-			>
-				<span class="chip {item.tint}">{item.title}</span>
-				<p class="text-sm mt-3" style="color: var(--ink-muted); line-height: 1.5;">{item.body}</p>
-				{#if item.href}
-					<p class="text-xs mt-2 board" style="color: var(--brand); letter-spacing: 0.14em;">step inside →</p>
-				{/if}
-			</svelte:element>
-		{/each}
 	</div>
 </section>
