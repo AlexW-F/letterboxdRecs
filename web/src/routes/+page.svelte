@@ -59,10 +59,25 @@
 	/>
 </div>
 
+<!-- Progressive frost under the billing block: a low backdrop blur whose
+     strength fades in via a mask, so there's no hard edge where the filter
+     starts. Sits between the canvas and the text — it only ever blurs the
+     cloud, never the type. -->
+<div
+	class="fixed inset-x-0 bottom-0 -z-[6] pointer-events-none"
+	style="
+		height: 48vh;
+		backdrop-filter: blur(7px) saturate(115%);
+		-webkit-backdrop-filter: blur(7px) saturate(115%);
+		mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.5) 38%, #000 78%);
+		-webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.5) 38%, #000 78%);
+	"
+></div>
+
 <!-- Bottom scrim so the billing block reads cleanly against the cloud -->
 <div
 	class="fixed inset-x-0 bottom-0 -z-[5] pointer-events-none"
-	style="height: 55vh; background: linear-gradient(180deg, transparent 0%, rgba(23, 22, 19, 0.55) 55%, rgba(20, 19, 16, 0.85) 100%);"
+	style="height: 55vh; background: linear-gradient(180deg, transparent 0%, rgba(23, 22, 19, 0.5) 55%, rgba(20, 19, 16, 0.82) 100%);"
 ></div>
 
 <section class="relative" style="z-index: 1; pointer-events: none;">
