@@ -13,6 +13,27 @@
 			.catch((e) => (error = e instanceof Error ? e.message : String(e)));
 	});
 
+	// Plain-language cards, relocated from the landing page so the cloud
+	// gets the whole stage there. The technical stages below stay technical.
+	const whatItDoes: { title: string; body: string; tint: string; href?: string }[] = [
+		{
+			title: 'Six ways to agree',
+			body: 'Fair averages, least-misery, or fuse the whole group into one taste and let the projector decide. Pick the politics that fit your friends.',
+			tint: 'chip-violet'
+		},
+		{
+			title: 'Knows the deep cuts',
+			body: '1,084 hand-curated tags plus plot embeddings under the hood — so the shortlist reaches past the same twenty films everyone recommends.',
+			tint: 'chip-brand'
+		},
+		{
+			title: 'Your taste, in 3D',
+			body: 'The lights on the landing page are real films. In the explore room you drift through them with your own ratings lit up around you.',
+			tint: 'chip-rose',
+			href: '/explore'
+		}
+	];
+
 	const stages = [
 		{
 			title: 'Candidate generation',
@@ -48,6 +69,23 @@
 			group-aware aggregation as a first-class step.
 		</p>
 	</header>
+
+	<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+		{#each whatItDoes as item, i (item.title)}
+			<svelte:element
+				this={item.href ? 'a' : 'div'}
+				href={item.href}
+				class="surface p-4 card-hover anim-fade-up block {i === 0 ? 'tilt-a' : i === 2 ? 'tilt-b' : ''}"
+				style="animation-delay: {i * 50}ms;"
+			>
+				<span class="chip {item.tint}">{item.title}</span>
+				<p class="text-sm mt-3" style="color: var(--ink-muted); line-height: 1.5;">{item.body}</p>
+				{#if item.href}
+					<p class="text-xs mt-2 board" style="color: var(--brand); letter-spacing: 0.14em;">step inside →</p>
+				{/if}
+			</svelte:element>
+		{/each}
+	</div>
 
 	{#if health}
 		<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
