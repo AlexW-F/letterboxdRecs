@@ -237,7 +237,7 @@
 				<UsersIcon size={11} />
 				Group · {members.length} members · {strategy.replace(/_/g, ' ')}
 			</span>
-			<h1 class="display-md mt-2" style="font-family: 'Playfair Display', Georgia, serif; font-style: italic;">
+			<h1 class="display-md mt-2">
 				Picks <span class="text-gradient">your group</span> will love.
 			</h1>
 			<div class="mt-2 flex flex-wrap items-center gap-2">
@@ -275,12 +275,12 @@
 			Loading shared group <code>{groupId}</code>…
 		</div>
 	{:else if members.length < 2}
-		<div class="surface p-5 text-sm" style="background: var(--rose-dim); border-color: rgba(248,113,113,0.3);">
+		<div class="surface p-5 text-sm" style="background: var(--rose-dim); border-color: rgba(187, 119, 68, 0.4);">
 			You need at least 2 group members.
 			{#if groupId}
-				Open <a href="/group/{groupId}/join" class="underline" style="color: #fca5a5;">the join link →</a>
+				Open <a href="/group/{groupId}/join" class="underline" style="color: var(--rust);">the join link →</a>
 			{:else}
-				<a href="/" class="underline" style="color: #fca5a5;">Go add some →</a>
+				<a href="/" class="underline" style="color: var(--rust);">Go add some →</a>
 			{/if}
 		</div>
 	{:else}
@@ -292,6 +292,25 @@
 		</div>
 
 		{#if serverGroup}
+			{#if winner}
+				{@const winnerClean = winner.title.replace(/\s*\((19|20)\d{2}\)\s*$/, '')}
+				<!-- The board out front. Highest net vote gets its name in lights. -->
+				<div class="marquee-board px-8 py-5 text-center anim-fade-up" style="animation-delay: 40ms;">
+					<div class="board text-[11px]" style="color: var(--ink-faint); letter-spacing: 0.3em;">
+						★ Now Showing ★
+					</div>
+					<div
+						class="board neon-amber font-semibold my-1.5"
+						style="font-size: clamp(1.4rem, 3.4vw, 2.3rem); letter-spacing: 0.06em;"
+					>
+						{winnerClean}
+					</div>
+					<div class="flex justify-center gap-6 mono text-[11px]" style="letter-spacing: 0.16em;">
+						<span class="neon-green">+{winner.up} YES</span>
+						<span style="color: {winner.veto > 0 ? 'var(--rust)' : 'var(--ink-faint)'};">−{winner.veto} VETO</span>
+					</div>
+				</div>
+			{/if}
 			<div class="surface p-4 flex flex-wrap items-center gap-4 text-sm anim-fade-up" style="animation-delay: 40ms;">
 				<label class="flex items-center gap-2">
 					<span class="text-[10px] uppercase tracking-[0.14em]" style="color: var(--ink-faint);">
@@ -303,20 +322,9 @@
 						{/each}
 					</select>
 				</label>
-				{#if winner}
-					<div class="ml-auto flex items-center gap-2">
-						<span class="chip chip-brand">
-							<Sparkles size={11} />
-							Group pick
-						</span>
-						<span class="font-medium">{winner.title}</span>
-						<span class="text-[11px] mono" style="color: var(--ink-faint);">
-							+{winner.up} / −{winner.veto}
-						</span>
-					</div>
-				{:else}
+				{#if !winner}
 					<span class="text-[11px]" style="color: var(--ink-faint);">
-						Vote up / skip on each card — the highest net vote becomes the group pick.
+						Vote yes / veto on each ticket — the highest net vote goes up on the marquee.
 					</span>
 				{/if}
 			</div>
@@ -340,13 +348,13 @@
 					/>
 				</label>
 				{#if stale}
-					<span class="text-[11px] ml-auto" style="color: #fde68a;">
+					<span class="text-[11px] ml-auto" style="color: var(--brand);">
 						settings changed — results below are from the previous run
 					</span>
 				{/if}
 				<button
 					class="btn btn-secondary {stale ? '' : 'ml-auto'}"
-					style={stale ? 'box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.45);' : ''}
+					style={stale ? 'box-shadow: 0 0 0 2px rgba(201, 165, 84, 0.5);' : ''}
 					onclick={run}
 					disabled={busy}
 				>
@@ -362,7 +370,7 @@
 		</div>
 
 		{#if error}
-			<p class="text-sm rounded-md px-3 py-2" style="background: var(--rose-dim); border: 1px solid rgba(248,113,113,0.3); color: #fecaca;">{error}</p>
+			<p class="text-sm rounded-md px-3 py-2" style="background: var(--rose-dim); border: 1px solid rgba(187, 119, 68, 0.4); color: #dda679;">{error}</p>
 		{/if}
 
 		{#if watchlistResult && watchlistResult.items.length > 0}
@@ -389,7 +397,7 @@
 						{@const yearMatch = it.title.match(/\((19|20)\d{2}\)\s*$/)}
 						<div
 							class="surface p-3 flex items-center gap-3"
-							style="background: rgba(139, 92, 246, 0.06); border-color: rgba(139, 92, 246, 0.22);"
+							style="background: rgba(143, 175, 122, 0.07); border-color: rgba(143, 175, 122, 0.25);"
 						>
 							<div class="flex-1 min-w-0">
 								<div class="font-medium text-sm leading-tight truncate" title={it.title}>
@@ -448,56 +456,70 @@
 		{/if}
 
 		{#if topResult}
-			<div class="flex flex-wrap items-center gap-1 text-sm" role="tablist">
-				<button
-					class="btn btn-pill text-xs {view === 'top' ? 'btn-secondary' : 'btn-ghost'}"
-					role="tab"
-					aria-selected={view === 'top'}
-					onclick={() => (view = 'top')}
+			<div class="relative">
+				<div class="flex flex-wrap items-center gap-1.5 text-sm lg:pr-56" role="tablist">
+					<button
+						class="btn btn-pill text-xs board"
+						style="letter-spacing: 0.14em; {view === 'top'
+							? 'color: var(--brand); border: 1px solid rgba(201, 165, 84, 0.6); background: rgba(201, 165, 84, 0.06); text-shadow: 0 0 8px rgba(201, 165, 84, 0.55); box-shadow: 0 0 10px rgba(201, 165, 84, 0.18);'
+							: 'color: var(--ink-faint); border: 1px solid var(--border);'}"
+						role="tab"
+						aria-selected={view === 'top'}
+						onclick={() => (view = 'top')}
+					>
+						<Sparkles size={12} />
+						Top picks
+					</button>
+					<button
+						class="btn btn-pill text-xs board"
+						style="letter-spacing: 0.14em; {view === 'argue'
+							? 'color: var(--rust); border: 1px solid rgba(187, 119, 68, 0.6); background: rgba(187, 119, 68, 0.06); text-shadow: 0 0 8px rgba(187, 119, 68, 0.55); box-shadow: 0 0 10px rgba(187, 119, 68, 0.16);'
+							: 'color: rgba(207, 138, 82, 0.65); border: 1px solid rgba(187, 119, 68, 0.3);'}"
+						role="tab"
+						aria-selected={view === 'argue'}
+						onclick={() => (view = 'argue')}
+						disabled={!argueResult || argueResult.recommendations.length === 0}
+						title="Films one of you loves and another would skip"
+					>
+						<UsersIcon size={12} />
+						Argue about this
+						{#if argueResult}
+							<span class="text-[10px] mono ml-1" style="color: var(--ink-faint);">
+								{argueResult.recommendations.length}
+							</span>
+						{/if}
+					</button>
+					<button
+						class="btn btn-pill text-xs board"
+						style="letter-spacing: 0.14em; {view === 'seen'
+							? 'color: var(--green); border: 1px solid rgba(143, 175, 122, 0.65); background: rgba(143, 175, 122, 0.06); text-shadow: 0 0 8px rgba(95, 135, 95, 0.6); box-shadow: 0 0 10px rgba(95, 135, 95, 0.18);'
+							: 'color: rgba(143, 175, 122, 0.6); border: 1px solid rgba(143, 175, 122, 0.28);'}"
+						role="tab"
+						aria-selected={view === 'seen'}
+						onclick={() => (view = 'seen')}
+						disabled={!seenResult || seenResult.recommendations.length === 0}
+						title="Strict: no member has rated or watched any film in this list"
+					>
+						<Eye size={12} />
+						Nobody's seen
+					</button>
+				</div>
+				<span
+					class="chalk absolute right-0 -top-1 hidden lg:block"
+					style="font-size: 1.15rem; transform: rotate(-2deg);"
+					aria-hidden="true"
 				>
-					<Sparkles size={12} />
-					Top picks
-				</button>
-				<button
-					class="btn btn-pill text-xs {view === 'argue' ? 'btn-secondary' : 'btn-ghost'}"
-					role="tab"
-					aria-selected={view === 'argue'}
-					onclick={() => (view = 'argue')}
-					disabled={!argueResult || argueResult.recommendations.length === 0}
-					title="Films one of you loves and another would skip"
-				>
-					<UsersIcon size={12} />
-					Argue about this
-					{#if argueResult}
-						<span class="text-[10px] mono ml-1" style="color: var(--ink-faint);">
-							{argueResult.recommendations.length}
-						</span>
-					{/if}
-				</button>
-				<button
-					class="btn btn-pill text-xs {view === 'seen' ? 'btn-secondary' : 'btn-ghost'}"
-					role="tab"
-					aria-selected={view === 'seen'}
-					onclick={() => (view = 'seen')}
-					disabled={!seenResult || seenResult.recommendations.length === 0}
-					title="Strict: no member has rated or watched any film in this list"
-				>
-					<Eye size={12} />
-					Nobody's seen
-				</button>
-				{#if view === 'argue'}
-					<span class="text-[11px] ml-3" style="color: var(--ink-muted);">
+					the “argue” tab is where friendships end&nbsp;&nbsp;↴
+				</span>
+				<p class="text-[11px] mt-1.5" style="color: var(--ink-muted);">
+					{#if view === 'argue'}
 						sorted by per-member score spread — high stakes movie nights live here
-					</span>
-				{:else if view === 'seen'}
-					<span class="text-[11px] ml-3" style="color: var(--ink-muted);">
+					{:else if view === 'seen'}
 						strict — drops any film any member has rated or watched (vs. Top picks, which leaks)
-					</span>
-				{:else if view === 'top'}
-					<span class="text-[11px] ml-3" style="color: var(--ink-muted);">
+					{:else}
 						may include films one of you has seen (per-member exclude)
-					</span>
-				{/if}
+					{/if}
+				</p>
 			</div>
 
 			{#if activeResult && activeResult.recommendations.length > 0}

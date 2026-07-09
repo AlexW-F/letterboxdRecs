@@ -111,7 +111,7 @@
 	<header class="flex items-end justify-between flex-wrap gap-3">
 		<div>
 			<span class="chip chip-brand">Solo · personalized re-rank</span>
-			<h1 class="display-md mt-2" style="font-family: 'Playfair Display', Georgia, serif; font-style: italic;">
+			<h1 class="display-md mt-2">
 				Recommendations <span class="text-gradient">for one</span>.
 			</h1>
 			<p class="text-sm" style="color: var(--ink-muted);">
@@ -143,7 +143,7 @@
 			/>
 			<div
 				class="text-[11px] rounded-md px-3 py-2 leading-relaxed"
-				style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); color: var(--ink-muted);"
+				style="background: rgba(215, 196, 131, 0.04); border: 1px solid var(--border); color: var(--ink-muted);"
 			>
 				<div class="font-medium" style="color: var(--ink-dim);">Where to find your CSVs</div>
 				<div class="mt-1">
@@ -163,7 +163,7 @@
 			{#if error}
 				<p
 					class="text-sm rounded-md px-3 py-2"
-					style="background: var(--rose-dim); border: 1px solid rgba(248, 113, 113, 0.3); color: #fecaca;"
+					style="background: var(--rose-dim); border: 1px solid rgba(187, 119, 68, 0.4); color: #dda679;"
 				>
 					{error}
 				</p>

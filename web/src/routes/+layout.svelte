@@ -1,8 +1,20 @@
 <script lang="ts">
 	import '../app.css';
+	// Self-hosted fonts (no third-party font CDN): Oswald letterboard display,
+	// Inter body, JetBrains Mono readouts, Caveat for handwritten notes.
+	import '@fontsource/oswald/400.css';
+	import '@fontsource/oswald/500.css';
+	import '@fontsource/oswald/600.css';
+	import '@fontsource/inter/400.css';
+	import '@fontsource/inter/500.css';
+	import '@fontsource/inter/600.css';
+	import '@fontsource/inter/700.css';
+	import '@fontsource/jetbrains-mono/400.css';
+	import '@fontsource/jetbrains-mono/500.css';
+	import '@fontsource/caveat/500.css';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { Film, BookOpen } from 'lucide-svelte';
+	import { BookOpen } from 'lucide-svelte';
 	import { getHealth, type Health } from '$lib/api';
 
 	let { children } = $props();
@@ -27,35 +39,24 @@
 
 <svelte:head>
 	<title>movienight · group movie recommender</title>
-	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-	<link
-		rel="stylesheet"
-		href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&display=swap"
-	/>
 </svelte:head>
 
 <div class="min-h-screen flex flex-col grain relative">
 	<header
 		class="sticky top-0 z-30 border-b"
 		style="
-			background: rgba(10, 12, 16, 0.72);
-			backdrop-filter: blur(14px) saturate(140%);
-			-webkit-backdrop-filter: blur(14px) saturate(140%);
+			background: rgba(27, 26, 23, 0.78);
+			backdrop-filter: blur(14px) saturate(120%);
+			-webkit-backdrop-filter: blur(14px) saturate(120%);
 			border-color: var(--border);
 		"
 	>
 		<div class="max-w-6xl mx-auto px-6 py-3 flex items-center gap-6">
-			<a href="/" class="flex items-center gap-2 group">
+			<a href="/" class="group">
 				<span
-					class="grid place-items-center w-8 h-8 rounded-md transition"
-					style="background: linear-gradient(135deg, #34d399, #fbbf24); box-shadow: 0 4px 14px -4px rgba(52, 211, 153, 0.4);"
-				>
-					<Film size={16} color="#0a0c10" strokeWidth={2.5} />
-				</span>
-				<span class="font-semibold tracking-tight">
-					movie<span class="text-gradient">night</span>
-				</span>
+					class="board neon-amber font-medium"
+					style="font-size: 1.02rem; letter-spacing: 0.14em;"
+				>mov<span class="neon-dead">i</span>enight</span>
 			</a>
 
 			<nav class="hidden sm:flex items-center gap-1 text-sm">
@@ -76,34 +77,37 @@
 				{/each}
 			</nav>
 
-			<div class="ml-auto flex items-center gap-3 text-xs" style="color: var(--ink-dim);">
+			<div class="ml-auto flex items-center gap-4 text-xs" style="color: var(--ink-dim);">
 				{#if health?.status === 'ok'}
-					<span class="flex items-center gap-1.5">
+					<span
+						class="board neon-green inline-flex items-center gap-2 rounded-md px-2.5 py-1"
+						style="font-size: 0.64rem; letter-spacing: 0.28em; border: 1px solid rgba(143, 175, 122, 0.5); box-shadow: 0 0 10px rgba(95, 135, 95, 0.22), inset 0 0 8px rgba(95, 135, 95, 0.1);"
+						title="{health.catalog_size.toLocaleString()} films · SVD + ALS + genome{health.movie_space_loaded ? ' · 3D' : ''}"
+					>
 						<span
 							class="inline-block w-1.5 h-1.5 rounded-full"
-							style="background: #34d399; box-shadow: 0 0 8px #34d399;"
+							style="background: var(--green); box-shadow: 0 0 8px var(--green);"
 						></span>
-						<span class="hidden md:inline">
-							{health.catalog_size.toLocaleString()} films · SVD + ALS + genome
-							{#if health.movie_space_loaded}· 3D viz{/if}
-						</span>
-						<span class="md:hidden">ok</span>
+						Open
+					</span>
+					<span class="hidden md:inline mono" style="letter-spacing: 0.08em;">
+						{health.catalog_size.toLocaleString()} titles
 					</span>
 				{:else if health === undefined}
 					<span class="flex items-center gap-1.5">
 						<span
 							class="inline-block w-1.5 h-1.5 rounded-full animate-pulse"
-							style="background: rgba(245, 247, 250, 0.35);"
+							style="background: rgba(215, 196, 131, 0.4);"
 						></span>
-						<span>connecting…</span>
+						<span>opening up…</span>
 					</span>
 				{:else}
-					<span class="flex items-center gap-1.5">
+					<span class="flex items-center gap-1.5" style="color: var(--rust);">
 						<span
 							class="inline-block w-1.5 h-1.5 rounded-full animate-pulse"
-							style="background: #f87171;"
+							style="background: var(--rust-deep);"
 						></span>
-						<span>api offline</span>
+						<span>closed — api offline</span>
 					</span>
 				{/if}
 				<a
@@ -154,27 +158,27 @@
 
 	<footer
 		class="border-t px-6 py-4 text-xs relative z-10"
-		style="border-color: var(--border); color: var(--ink);"
+		style="border-color: var(--border); color: var(--ink-muted);"
 	>
 		<div class="max-w-6xl mx-auto flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-center">
-			<span>movienight · group movie recommender · No tracking</span>
-			<span style="color: var(--ink-dim);">·</span>
-			<a href="/explore" class="underline hover:opacity-80" style="color: var(--ink);">
-				Personalized 3D space
+			<span>movienight · the late show · no tracking, no accounts</span>
+			<span style="color: var(--ink-faint);">·</span>
+			<a href="/explore" class="underline hover:opacity-80" style="color: var(--ink-muted);">
+				your taste in 3D
 			</a>
-			<span style="color: var(--ink-dim);">·</span>
+			<span style="color: var(--ink-faint);">·</span>
 			<a
 				href="https://www.themoviedb.org/"
 				target="_blank"
 				rel="noopener noreferrer"
 				class="inline-flex items-center gap-2 hover:opacity-80 transition"
-				style="color: var(--ink);"
+				style="color: var(--ink-muted);"
 				title="Posters and streaming availability from TMDB"
 			>
-				<span>Posters &amp; streaming via</span>
-				<img src="/tmdb-logo.svg" alt="TMDB" class="h-3 w-auto" />
+				<span>posters &amp; streaming via</span>
+				<img src="/tmdb-logo.svg" alt="TMDB" class="h-3 w-auto" style="opacity: 0.8;" />
 			</a>
-			<span class="hidden md:inline text-[10px]" style="color: var(--ink-muted);">
+			<span class="hidden md:inline text-[10px]" style="color: var(--ink-faint);">
 				— uses the TMDB API but is not endorsed or certified by TMDB.
 			</span>
 		</div>

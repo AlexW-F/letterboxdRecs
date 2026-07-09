@@ -98,7 +98,7 @@
 			';';
 
 		const scene = new THREE.Scene();
-		scene.fog = new THREE.Fog(0x0a0c10, 18, 80);
+		scene.fog = new THREE.Fog(0x1b1a17, 18, 80);
 
 		const camera = new THREE.PerspectiveCamera(
 			72,
@@ -149,7 +149,11 @@
 			c.set(hex);
 			const hsl = { h: 0, s: 0, l: 0 };
 			c.getHSL(hsl);
-			c.setHSL(hsl.h, Math.min(1, hsl.s * 1.4 + 0.1), Math.max(0.55, Math.min(0.75, hsl.l)));
+			// Compress the backend's full-spectrum genre hues into the miasma
+			// band (rust ~20° through moss ~112°) so the cloud reads as embers
+			// over the theater, while genres stay distinguishable from each other.
+			const warmHue = 0.055 + hsl.h * 0.255;
+			c.setHSL(warmHue, 0.42 + hsl.s * 0.2, Math.max(0.52, Math.min(0.68, hsl.l)));
 			colors[3 * i] = c.r;
 			colors[3 * i + 1] = c.g;
 			colors[3 * i + 2] = c.b;
@@ -201,7 +205,8 @@
 					if (r > 1.0) discard;
 					float halo = exp(-r * 3.4);
 					float core = pow(1.0 - r, 7.0);
-					vec3 col = mix(vColor, vec3(1.0), core * 0.55);
+					// Warm-white core — tungsten bulbs, not starlight.
+					vec3 col = mix(vColor, vec3(1.0, 0.94, 0.78), core * 0.55);
 					float intensity = (halo * 0.75 + core * 2.2) * vTwinkle;
 					float depthFade = 1.0 - smoothstep(22.0, 72.0, vDist);
 					intensity *= 0.45 + 0.55 * depthFade;
@@ -361,8 +366,8 @@
 					varying float vPulse;
 					void main() {
 						float depthFade = 1.0 - smoothstep(14.0, 55.0, vDist);
-						// Hot-white peak during the flash, colored ambient otherwise.
-						vec3 col = mix(vColor * 0.85, vec3(1.0), clamp(vPulse * 0.18, 0.0, 0.7));
+						// Warm-white peak during the flash, colored ambient otherwise.
+						vec3 col = mix(vColor * 0.85, vec3(1.0, 0.93, 0.76), clamp(vPulse * 0.18, 0.0, 0.7));
 						float a = 0.09 * depthFade * vPulse;
 						gl_FragColor = vec4(col, a);
 					}
@@ -697,7 +702,7 @@
 					class="inline-block w-1.5 h-1.5 rounded-full"
 					style="background: var(--brand); box-shadow: 0 0 12px var(--brand); animation: pulse-slow 1.5s ease-in-out infinite;"
 				></span>
-				weaving the cloud…
+				lighting the marquee…
 			</div>
 		</div>
 	{/if}
@@ -738,7 +743,7 @@
 		<div
 			class="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full text-xs mono pointer-events-none transition"
 			style="
-				background: rgba(10, 12, 16, 0.78);
+				background: rgba(27, 26, 23, 0.8);
 				border: 1px solid var(--border);
 				color: {hoveredTitle ? 'var(--ink)' : 'var(--ink-faint)'};
 				backdrop-filter: blur(6px);
@@ -756,7 +761,7 @@
 					<span style="color: var(--ink-faint); margin-left: 0.4rem;">· {hoveredGenre}</span>
 				{/if}
 			{:else}
-				✦  drift through the latent space{#if enableDrag}  ✦  drag to look around{/if}
+				✦  every light is a film{#if enableDrag}  ✦  drag to look around{/if}
 			{/if}
 		</div>
 
@@ -783,8 +788,8 @@
 		width: 5px;
 		height: 5px;
 		border-radius: 999px;
-		background: rgba(245, 247, 250, 0.85);
-		box-shadow: 0 0 6px rgba(245, 247, 250, 0.55);
+		background: rgba(215, 196, 131, 0.85);
+		box-shadow: 0 0 6px rgba(201, 165, 84, 0.6);
 		flex-shrink: 0;
 	}
 
@@ -794,8 +799,8 @@
 		height: 1px;
 		background: linear-gradient(
 			90deg,
-			rgba(245, 247, 250, 0.55),
-			rgba(245, 247, 250, 0.18)
+			rgba(215, 196, 131, 0.55),
+			rgba(215, 196, 131, 0.16)
 		);
 		flex-shrink: 0;
 	}
@@ -803,25 +808,25 @@
 	.label-card {
 		display: inline-flex;
 		align-items: center;
-		padding: 0.32rem 0.6rem;
+		padding: 0.28rem 0.6rem;
 		border-radius: 0.55rem;
-		background: rgba(10, 12, 16, 0.78);
-		border: 1px solid rgba(255, 255, 255, 0.14);
-		backdrop-filter: blur(10px) saturate(140%);
-		-webkit-backdrop-filter: blur(10px) saturate(140%);
-		box-shadow: 0 6px 20px -10px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+		background: rgba(27, 26, 23, 0.8);
+		border: 1px solid rgba(215, 196, 131, 0.18);
+		backdrop-filter: blur(10px) saturate(130%);
+		-webkit-backdrop-filter: blur(10px) saturate(130%);
+		box-shadow: 0 6px 20px -10px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(215, 196, 131, 0.04) inset;
 		transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 	}
 
+	/* Film titles in the projectionist's hand. */
 	.label-text {
-		font-family: 'Playfair Display', Georgia, serif;
-		font-style: italic;
-		font-size: 0.84rem;
-		color: rgba(245, 247, 250, 0.95);
+		font-family: 'Caveat', cursive;
+		font-size: 1.02rem;
+		color: rgba(215, 196, 131, 0.95);
 		letter-spacing: 0.01em;
 		max-width: 28ch;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		line-height: 1;
+		line-height: 1.05;
 	}
 </style>

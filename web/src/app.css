@@ -1,39 +1,45 @@
 @import 'tailwindcss';
 
 /* ----------------------------------------------------------------------
-   Design tokens
+   Design tokens — "midnight marquee" on the miasma palette.
+   Warm charcoal room, tan ink, and neon signage: amber for the main
+   sign, green for OPEN/yes, rust for veto/argue. Glow means a lit sign.
    ---------------------------------------------------------------------- */
 
 :root {
 	color-scheme: dark;
 
 	/* Surfaces */
-	--bg: #0a0c10;
-	--bg-tint: #11141a;
-	--surface: rgba(255, 255, 255, 0.04);
-	--surface-strong: rgba(255, 255, 255, 0.07);
-	--border: rgba(255, 255, 255, 0.08);
-	--border-strong: rgba(255, 255, 255, 0.18);
+	--bg: #1b1a17;
+	--bg-tint: #201e19;
+	--surface: rgba(215, 196, 131, 0.045);
+	--surface-strong: rgba(215, 196, 131, 0.085);
+	--border: rgba(215, 196, 131, 0.15);
+	--border-strong: rgba(215, 196, 131, 0.3);
 
 	/* Text */
-	--ink: #f5f7fa;
-	--ink-muted: rgba(245, 247, 250, 0.65);
-	--ink-dim: rgba(245, 247, 250, 0.6);
-	--ink-faint: rgba(245, 247, 250, 0.5);
+	--ink: #d7c483;
+	--ink-muted: rgba(215, 196, 131, 0.65);
+	--ink-dim: rgba(215, 196, 131, 0.58);
+	--ink-faint: rgba(215, 196, 131, 0.48);
 
-	/* Brand */
-	--brand: #34d399; /* emerald — primary action */
-	--brand-dim: rgba(52, 211, 153, 0.18);
-	--accent: #fbbf24; /* gold — festival */
-	--accent-dim: rgba(251, 191, 36, 0.15);
-	--violet: #a78bfa; /* group flow */
-	--violet-dim: rgba(167, 139, 250, 0.18);
-	--rose: #f87171;
-	--rose-dim: rgba(248, 113, 113, 0.15);
+	/* Signage */
+	--brand: #c9a554; /* amber — the main sign, primary action */
+	--brand-dim: rgba(201, 165, 84, 0.16);
+	--accent: #c9a554; /* alias kept for older markup */
+	--accent-dim: rgba(201, 165, 84, 0.14);
+	--violet: #8faf7a; /* green — OPEN, yes-votes, group flow */
+	--violet-dim: rgba(143, 175, 122, 0.14);
+	--rose: #cf8a52; /* rust — veto, argue, errors */
+	--rose-dim: rgba(187, 119, 68, 0.13);
+	--green: #8faf7a;
+	--green-deep: #5f875f;
+	--rust: #cf8a52;
+	--rust-deep: #bb7744;
 
 	/* Effects */
-	--glow-brand: 0 0 0 1px rgba(52, 211, 153, 0.45), 0 14px 50px -12px rgba(52, 211, 153, 0.4);
-	--glow-violet: 0 0 0 1px rgba(167, 139, 250, 0.45), 0 14px 50px -12px rgba(167, 139, 250, 0.4);
+	--glow-brand: 0 0 0 1px rgba(201, 165, 84, 0.45), 0 0 26px -4px rgba(201, 165, 84, 0.4);
+	--glow-violet: 0 0 0 1px rgba(143, 175, 122, 0.45), 0 0 26px -4px rgba(95, 135, 95, 0.4);
 }
 
 /* ----------------------------------------------------------------------
@@ -52,9 +58,9 @@ body {
 
 body {
 	background-image:
-		radial-gradient(ellipse at top right, rgba(52, 211, 153, 0.06), transparent 50%),
-		radial-gradient(ellipse at top left, rgba(167, 139, 250, 0.04), transparent 50%),
-		radial-gradient(circle at 50% 110%, rgba(251, 191, 36, 0.03), transparent 60%);
+		radial-gradient(ellipse at top right, rgba(201, 165, 84, 0.06), transparent 50%),
+		radial-gradient(ellipse at top left, rgba(95, 135, 95, 0.05), transparent 50%),
+		radial-gradient(circle at 50% 110%, rgba(187, 119, 68, 0.05), transparent 60%);
 	background-attachment: fixed;
 }
 
@@ -66,26 +72,43 @@ body {
 /* Keyboard focus — visible ring on anything reachable by Tab. Inputs keep
    their own border treatment (.input:focus overrides with outline: none). */
 :focus-visible {
-	outline: 2px solid rgba(52, 211, 153, 0.7);
+	outline: 2px solid rgba(201, 165, 84, 0.75);
 	outline-offset: 2px;
 }
 
 /* ----------------------------------------------------------------------
-   Typography utilities
+   Typography — Oswald letterboard display, Inter body, mono readouts,
+   Caveat for the projectionist's handwriting.
    ---------------------------------------------------------------------- */
 
 .display-xl {
-	font-size: clamp(2.25rem, 4vw + 0.5rem, 4rem);
-	line-height: 1;
-	letter-spacing: -0.03em;
-	font-weight: 600;
+	font-family: 'Oswald', 'Inter', sans-serif;
+	font-size: clamp(2.5rem, 4.5vw + 0.5rem, 4.5rem);
+	line-height: 1.08;
+	letter-spacing: 0.03em;
+	font-weight: 500;
+	text-transform: uppercase;
 }
 
 .display-md {
-	font-size: clamp(1.5rem, 2vw + 0.5rem, 2.25rem);
-	line-height: 1.1;
-	letter-spacing: -0.025em;
-	font-weight: 600;
+	font-family: 'Oswald', 'Inter', sans-serif;
+	font-size: clamp(1.5rem, 2vw + 0.5rem, 2.3rem);
+	line-height: 1.12;
+	letter-spacing: 0.04em;
+	font-weight: 500;
+	text-transform: uppercase;
+}
+
+.board {
+	font-family: 'Oswald', 'Inter', sans-serif;
+	text-transform: uppercase;
+	letter-spacing: 0.2em;
+}
+
+.chalk {
+	font-family: 'Caveat', cursive;
+	color: rgba(215, 196, 131, 0.75);
+	letter-spacing: 0;
 }
 
 .text-balance {
@@ -93,28 +116,53 @@ body {
 }
 
 .mono {
-	font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+	font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
-/* Subtle gradient text for hero, status pills */
+/* Lit signage. Kept under the old .text-gradient name too so any stray
+   markup still lights up instead of silently losing its emphasis. */
+.neon-amber,
 .text-gradient {
-	background: linear-gradient(135deg, #6ee7b7 0%, #34d399 50%, #fbbf24 100%);
-	background-clip: text;
-	-webkit-background-clip: text;
-	color: transparent;
+	color: var(--brand);
+	text-shadow:
+		0 0 6px rgba(201, 165, 84, 0.9),
+		0 0 18px rgba(201, 165, 84, 0.5),
+		0 0 42px rgba(201, 165, 84, 0.28);
+}
+
+.neon-green {
+	color: var(--green);
+	text-shadow:
+		0 0 6px rgba(143, 175, 122, 0.9),
+		0 0 16px rgba(95, 135, 95, 0.55),
+		0 0 36px rgba(95, 135, 95, 0.3);
+}
+
+.neon-rust {
+	color: var(--rust);
+	text-shadow:
+		0 0 6px rgba(207, 138, 82, 0.9),
+		0 0 16px rgba(187, 119, 68, 0.55),
+		0 0 36px rgba(187, 119, 68, 0.3);
+}
+
+/* One letter's transformer is on its way out — management is aware. */
+.neon-dead {
+	color: rgba(215, 196, 131, 0.26);
+	text-shadow: 0 0 3px rgba(201, 165, 84, 0.15);
 }
 
 /* Per-line scrim that hugs the text — uses box-decoration-break so
    a wrapped paragraph gets a separate background strip per line
-   instead of one big rectangle. */
+   instead of one big rectangle. No backdrop-filter: when adjacent
+   lines' strips overlap, Chromium blurs the earlier line's glyphs
+   into the later strip and the headline ghosts. */
 .text-scrim {
-	background: rgba(10, 12, 16, 0.55);
+	background: rgba(27, 26, 23, 0.6);
 	padding: 0.1em 0.4em;
 	border-radius: 0.35em;
 	box-decoration-break: clone;
 	-webkit-box-decoration-break: clone;
-	backdrop-filter: blur(8px) saturate(135%);
-	-webkit-backdrop-filter: blur(8px) saturate(135%);
 }
 
 /* ----------------------------------------------------------------------
@@ -124,7 +172,7 @@ body {
 .surface {
 	background: var(--surface);
 	border: 1px solid var(--border);
-	border-radius: 0.85rem;
+	border-radius: 0.6rem;
 	backdrop-filter: blur(8px);
 	-webkit-backdrop-filter: blur(8px);
 }
@@ -132,7 +180,7 @@ body {
 .surface-strong {
 	background: var(--surface-strong);
 	border: 1px solid var(--border-strong);
-	border-radius: 0.85rem;
+	border-radius: 0.6rem;
 }
 
 .card-hover {
@@ -144,7 +192,37 @@ body {
 	transform: translateY(-2px);
 	border-color: var(--border-strong);
 	background: var(--surface-strong);
-	box-shadow: 0 14px 30px -16px rgba(0, 0, 0, 0.6);
+	box-shadow: 0 14px 30px -16px rgba(0, 0, 0, 0.65);
+}
+
+/* The NOW SHOWING board — bulb border, slight hand-hung tilt. */
+.marquee-board {
+	position: relative;
+	border: 2px solid rgba(215, 196, 131, 0.24);
+	border-radius: 10px;
+	background: rgba(22, 21, 17, 0.92);
+	transform: rotate(-0.55deg);
+}
+
+.marquee-board::before {
+	content: '';
+	position: absolute;
+	inset: 7px;
+	border: 4px dotted rgba(215, 196, 131, 0.22);
+	border-radius: 6px;
+	pointer-events: none;
+}
+
+/* Ticket-stub chrome for recommendation cards. */
+.stub-tear {
+	border-right: 2px dashed rgba(215, 196, 131, 0.25);
+}
+
+.tilt-a {
+	transform: rotate(0.3deg);
+}
+.tilt-b {
+	transform: rotate(-0.28deg);
 }
 
 /* ----------------------------------------------------------------------
@@ -156,12 +234,13 @@ body {
 	align-items: center;
 	justify-content: center;
 	gap: 0.5rem;
-	padding: 0.6rem 1rem;
-	border-radius: 0.55rem;
+	padding: 0.6rem 1.1rem;
+	border-radius: 6px;
 	font-weight: 500;
 	font-size: 0.9rem;
 	letter-spacing: 0.002em;
-	transition: transform 120ms ease, background-color 160ms, color 160ms, box-shadow 200ms;
+	transition: transform 120ms ease, background-color 160ms, color 160ms, box-shadow 200ms,
+		border-color 160ms;
 	cursor: pointer;
 	border: 1px solid transparent;
 }
@@ -175,19 +254,38 @@ body {
 	opacity: 0.55;
 }
 
+/* Primary = the amber sign: outlined neon, letterboard type. */
 .btn-primary {
-	background: linear-gradient(180deg, #4ade80 0%, #34d399 100%);
-	color: #062a1a;
-	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 6px 14px -4px rgba(52, 211, 153, 0.5);
+	font-family: 'Oswald', 'Inter', sans-serif;
+	text-transform: uppercase;
+	letter-spacing: 0.16em;
+	font-size: 0.85rem;
+	color: var(--brand);
+	border: 1.5px solid var(--brand);
+	background: rgba(201, 165, 84, 0.05);
+	box-shadow: 0 0 14px rgba(201, 165, 84, 0.32), inset 0 0 14px rgba(201, 165, 84, 0.1);
+	text-shadow: 0 0 8px rgba(201, 165, 84, 0.65);
 }
 .btn-primary:hover:not(:disabled) {
-	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 12px 30px -6px rgba(52, 211, 153, 0.55);
+	background: rgba(201, 165, 84, 0.1);
+	box-shadow: 0 0 22px rgba(201, 165, 84, 0.45), inset 0 0 18px rgba(201, 165, 84, 0.14);
 }
 
+/* Secondary = the green sign (group flow, go-signals). */
 .btn-secondary {
-	background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
-	color: #1c1d3a;
-	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 6px 14px -4px rgba(99, 102, 241, 0.5);
+	font-family: 'Oswald', 'Inter', sans-serif;
+	text-transform: uppercase;
+	letter-spacing: 0.16em;
+	font-size: 0.85rem;
+	color: var(--green);
+	border: 1.5px solid rgba(143, 175, 122, 0.75);
+	background: rgba(143, 175, 122, 0.05);
+	box-shadow: 0 0 12px rgba(95, 135, 95, 0.28), inset 0 0 12px rgba(95, 135, 95, 0.1);
+	text-shadow: 0 0 8px rgba(95, 135, 95, 0.6);
+}
+.btn-secondary:hover:not(:disabled) {
+	background: rgba(143, 175, 122, 0.1);
+	box-shadow: 0 0 20px rgba(95, 135, 95, 0.4), inset 0 0 16px rgba(95, 135, 95, 0.14);
 }
 
 .btn-ghost {
@@ -223,25 +321,21 @@ body {
 	color: var(--ink-muted);
 }
 
-.chip-brand {
-	background: var(--brand-dim);
-	border-color: rgba(52, 211, 153, 0.4);
-	color: #6ee7b7;
-}
+.chip-brand,
 .chip-accent {
-	background: var(--accent-dim);
-	border-color: rgba(251, 191, 36, 0.4);
-	color: #fde68a;
+	background: var(--brand-dim);
+	border-color: rgba(201, 165, 84, 0.45);
+	color: #dcbc72;
 }
 .chip-violet {
 	background: var(--violet-dim);
-	border-color: rgba(167, 139, 250, 0.4);
-	color: #c4b5fd;
+	border-color: rgba(143, 175, 122, 0.45);
+	color: #a7c295;
 }
 .chip-rose {
 	background: var(--rose-dim);
-	border-color: rgba(248, 113, 113, 0.4);
-	color: #fecaca;
+	border-color: rgba(187, 119, 68, 0.45);
+	color: #dda679;
 }
 
 /* ----------------------------------------------------------------------
@@ -250,18 +344,18 @@ body {
 
 .input {
 	width: 100%;
-	background: rgba(0, 0, 0, 0.32);
+	background: rgba(12, 11, 9, 0.5);
 	border: 1px solid var(--border);
 	color: var(--ink);
 	padding: 0.55rem 0.8rem;
-	border-radius: 0.55rem;
+	border-radius: 6px;
 	font-size: 0.9rem;
 	transition: border-color 160ms, background 160ms;
 }
 .input:focus {
 	outline: none;
 	border-color: var(--brand);
-	background: rgba(0, 0, 0, 0.5);
+	background: rgba(12, 11, 9, 0.72);
 }
 
 /* ----------------------------------------------------------------------
@@ -322,9 +416,9 @@ body {
 .shimmer-bg {
 	background: linear-gradient(
 		90deg,
-		rgba(255, 255, 255, 0.025) 25%,
-		rgba(255, 255, 255, 0.06) 50%,
-		rgba(255, 255, 255, 0.025) 75%
+		rgba(215, 196, 131, 0.03) 25%,
+		rgba(215, 196, 131, 0.07) 50%,
+		rgba(215, 196, 131, 0.03) 75%
 	);
 	background-size: 200% 100%;
 	animation: shimmer 1.6s linear infinite;
@@ -370,11 +464,11 @@ body {
 	position: fixed;
 	inset: 0;
 	background-image:
-		radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+		radial-gradient(rgba(255, 244, 214, 0.028) 1px, transparent 1px);
 	background-size: 3px 3px;
 	pointer-events: none;
 	mix-blend-mode: overlay;
-	opacity: 0.4;
+	opacity: 0.45;
 	z-index: 0;
 }
 
@@ -382,7 +476,7 @@ body {
 .glow-ring {
 	position: absolute;
 	inset: -1rem;
-	background: radial-gradient(circle at 30% 30%, rgba(52, 211, 153, 0.18), transparent 60%);
+	background: radial-gradient(circle at 30% 30%, rgba(201, 165, 84, 0.16), transparent 60%);
 	filter: blur(40px);
 	z-index: -1;
 }
@@ -396,9 +490,9 @@ body {
 	background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-	background: rgba(255, 255, 255, 0.06);
+	background: rgba(215, 196, 131, 0.08);
 	border-radius: 999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-	background: rgba(255, 255, 255, 0.14);
+	background: rgba(215, 196, 131, 0.16);
 }
