@@ -26,6 +26,10 @@
 		"vite": "^8.0.7"
 	},
 	"dependencies": {
+		"@fontsource/caveat": "^5.2.8",
+		"@fontsource/inter": "^5.2.8",
+		"@fontsource/jetbrains-mono": "^5.2.8",
+		"@fontsource/oswald": "^5.2.8",
 		"@types/three": "^0.184.1",
 		"qrcode": "^1.5.4",
 		"three": "^0.184.0"

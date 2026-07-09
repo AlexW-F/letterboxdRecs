@@ -43,7 +43,7 @@
 			<Sparkles size={11} />
 			3D · UMAP projection of ALS latent space
 		</span>
-		<h1 class="display-md mt-2" style="font-family: 'Playfair Display', Georgia, serif; font-style: italic;">
+		<h1 class="display-md mt-2">
 			Your taste in <span class="text-gradient">3D</span>.
 		</h1>
 		<p class="text-sm max-w-3xl" style="color: var(--ink-muted);">
@@ -65,7 +65,7 @@
 						onclick={() => (selectedHash = m.hash)}
 						class="flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-sm transition"
 						style={selectedHash === m.hash
-							? 'background: var(--brand-dim); border: 1px solid rgba(52,211,153,0.55); color: #d1fae5;'
+							? 'background: var(--brand-dim); border: 1px solid rgba(201, 165, 84, 0.6); color: var(--brand);'
 							: 'background: var(--surface); border: 1px solid var(--border); color: var(--ink-muted);'}
 					>
 						<Avatar name={m.name} size={22} />
@@ -80,9 +80,9 @@
 	{:else}
 		<div
 			class="surface p-4 text-sm flex items-center gap-3"
-			style="background: var(--accent-dim); border-color: rgba(251,191,36,0.3);"
+			style="background: var(--accent-dim); border-color: rgba(201, 165, 84, 0.4);"
 		>
-			<Sparkles size={16} style="color: #fde68a;" />
+			<Sparkles size={16} style="color: var(--brand);" />
 			<div>
 				No uploads yet — showing the demo projection.
 				<a href="/" class="underline">Add a friend</a>
@@ -98,7 +98,7 @@
 		{#if loading}
 			<div
 				class="absolute inset-0 grid place-items-center z-10 pointer-events-none"
-				style="background: rgba(10, 12, 16, 0.5); backdrop-filter: blur(4px);"
+				style="background: rgba(27, 26, 23, 0.55); backdrop-filter: blur(4px);"
 			>
 				<div class="flex flex-col items-center gap-2 text-sm" style="color: var(--ink-muted);">
 					<div class="flex items-center gap-3">
@@ -112,7 +112,7 @@
 			</div>
 		{/if}
 		{#if error}
-			<div class="p-4 text-sm" style="color: #fca5a5;">
+			<div class="p-4 text-sm" style="color: var(--rust);">
 				Couldn't project <em>{selectedLabel}</em>: {error}
 				<span style="color: var(--ink-faint);">— showing the demo projection instead.</span>
 			</div>
@@ -122,14 +122,14 @@
 				srcdoc={personalizedHTML}
 				title="3D movie space — {selectedLabel}"
 				class="w-full block"
-				style="height: 80vh; border: 0; background: #0a0c10;"
+				style="height: 80vh; border: 0; background: #1b1a17;"
 			></iframe>
 		{:else if !loading}
 			<iframe
 				src="/movie_space.html"
 				title="3D movie space (demo)"
 				class="w-full block"
-				style="height: 80vh; border: 0; background: #0a0c10;"
+				style="height: 80vh; border: 0; background: #1b1a17;"
 			></iframe>
 		{/if}
 	</div>

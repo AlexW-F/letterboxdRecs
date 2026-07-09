@@ -20,7 +20,7 @@
 				onclick={() => (value = s.name)}
 				class="px-3 py-1.5 rounded-md text-sm transition"
 				style={value === s.name
-					? 'background: var(--violet-dim); border: 1px solid rgba(167,139,250,0.55); color: #ddd6fe;'
+					? 'background: var(--violet-dim); border: 1px solid rgba(143, 175, 122, 0.6); color: var(--green); text-shadow: 0 0 8px rgba(95, 135, 95, 0.5);'
 					: 'background: var(--surface); border: 1px solid var(--border); color: var(--ink-muted);'}
 				title={s.description}
 			>

@@ -55,11 +55,11 @@
 
 	function colorFor(v: number | null): string {
 		if (v === null) return 'var(--ink-dim)';
-		if (v >= 0.5) return '#34d399';
-		if (v >= 0.3) return '#86efac';
+		if (v >= 0.5) return '#8faf7a';
+		if (v >= 0.3) return '#a7c295';
 		if (v >= 0) return 'var(--ink-muted)';
-		if (v >= -0.3) return '#fdba74';
-		return '#f87171';
+		if (v >= -0.3) return '#cf8a52';
+		return 'var(--rust-deep)';
 	}
 
 	function labelFor(v: number | null): string {
@@ -90,7 +90,7 @@
 	<header class="flex items-end justify-between flex-wrap gap-3">
 		<div>
 			<span class="chip chip-violet">Group · compatibility report</span>
-			<h1 class="display-md mt-2" style="font-family: 'Playfair Display', Georgia, serif; font-style: italic;">
+			<h1 class="display-md mt-2">
 				How <span class="text-gradient">aligned</span> are you?
 			</h1>
 			<p class="text-sm" style="color: var(--ink-muted);">
@@ -113,12 +113,12 @@
 			Loading shared group <code>{groupId}</code>…
 		</div>
 	{:else if members.length < 2}
-		<div class="surface p-5 text-sm" style="background: var(--rose-dim); border-color: rgba(248,113,113,0.3);">
+		<div class="surface p-5 text-sm" style="background: var(--rose-dim); border-color: rgba(187, 119, 68, 0.4);">
 			Need at least 2 members.
 			{#if groupId}
-				Open <a href="/group/{groupId}/join" class="underline" style="color: #fca5a5;">the join link →</a>
+				Open <a href="/group/{groupId}/join" class="underline" style="color: var(--rust);">the join link →</a>
 			{:else}
-				<a href="/" class="underline" style="color: #fca5a5;">Add some →</a>
+				<a href="/" class="underline" style="color: var(--rust);">Add some →</a>
 			{/if}
 		</div>
 	{:else if busy}
@@ -127,7 +127,7 @@
 			<p class="text-sm" style="color: var(--ink-muted);">computing pairwise overlaps…</p>
 		</div>
 	{:else if error}
-		<p class="text-sm rounded-md px-3 py-2" style="background: var(--rose-dim); border: 1px solid rgba(248,113,113,0.3); color: #fecaca;">{error}</p>
+		<p class="text-sm rounded-md px-3 py-2" style="background: var(--rose-dim); border: 1px solid rgba(187, 119, 68, 0.4); color: #dda679;">{error}</p>
 	{:else if report}
 		{@const highlights = pairwiseHighlights(report)}
 
@@ -135,8 +135,8 @@
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-3 anim-fade-up">
 				{#if highlights.best}
 					<div class="surface p-4 anim-fade-up flex items-center gap-3">
-						<div class="grid place-items-center w-10 h-10 rounded-full" style="background: rgba(52,211,153,0.18);">
-							<Heart size={18} style="color: #6ee7b7;" />
+						<div class="grid place-items-center w-10 h-10 rounded-full" style="background: rgba(143, 175, 122, 0.16);">
+							<Heart size={18} style="color: var(--green);" />
 						</div>
 						<div>
 							<div class="text-[10px] uppercase tracking-[0.14em]" style="color: var(--ink-faint);">
@@ -145,7 +145,7 @@
 							<div class="text-base font-medium">
 								{highlights.best.pair[0]} ↔ {highlights.best.pair[1]}
 							</div>
-							<div class="text-xs mono" style="color: #6ee7b7;">
+							<div class="text-xs mono" style="color: var(--green);">
 								pearson {highlights.best.pearson_on_shared?.toFixed(2) ?? 'n/a'} ·
 								cosine {highlights.best.cosine_on_taste?.toFixed(2) ?? 'n/a'} ·
 								{highlights.best.n_shared_movies} shared films
@@ -155,8 +155,8 @@
 				{/if}
 				{#if highlights.worst && highlights.worst !== highlights.best}
 					<div class="surface p-4 anim-fade-up flex items-center gap-3" style="animation-delay: 60ms;">
-						<div class="grid place-items-center w-10 h-10 rounded-full" style="background: rgba(248,113,113,0.15);">
-							<AlertTriangle size={18} style="color: #fca5a5;" />
+						<div class="grid place-items-center w-10 h-10 rounded-full" style="background: rgba(187, 119, 68, 0.15);">
+							<AlertTriangle size={18} style="color: var(--rust);" />
 						</div>
 						<div>
 							<div class="text-[10px] uppercase tracking-[0.14em]" style="color: var(--ink-faint);">
@@ -165,7 +165,7 @@
 							<div class="text-base font-medium">
 								{highlights.worst.pair[0]} ↔ {highlights.worst.pair[1]}
 							</div>
-							<div class="text-xs mono" style="color: #fca5a5;">
+							<div class="text-xs mono" style="color: var(--rust);">
 								pearson {highlights.worst.pearson_on_shared?.toFixed(2) ?? 'n/a'} ·
 								cosine {highlights.worst.cosine_on_taste?.toFixed(2) ?? 'n/a'} ·
 								{highlights.worst.n_shared_movies} shared films
@@ -177,12 +177,12 @@
 		{/if}
 
 		<div class="surface p-5 anim-fade-up">
-			<h2 class="text-lg font-medium mb-3 flex items-center gap-2">Pairwise overlap</h2>
+			<h2 class="board text-base mb-3 flex items-center gap-2" style="letter-spacing: 0.18em;">Double features</h2>
 			<div class="space-y-2">
 				{#each report.pairwise as p (p.pair.join('+'))}
 					<div
 						class="flex items-center gap-3 px-3 py-2 rounded-lg"
-						style="background: rgba(0,0,0,0.2); border: 1px solid var(--border);"
+						style="background: rgba(12, 11, 9, 0.35); border: 1px solid var(--border);"
 					>
 						<div class="flex items-center -space-x-2">
 							<Avatar name={p.pair[0]} size={28} />
@@ -197,6 +197,19 @@
 							<div class="text-[11px] mono" style="color: var(--ink-faint);">
 								{p.n_shared_movies} shared films
 							</div>
+							{#if p.pearson_on_shared !== null}
+								<!-- Alignment meter: marker travels rust → amber → moss as
+								     the pair's pearson climbs from −1 to +1. -->
+								<div
+									class="relative h-1 rounded-full mt-1.5 max-w-56"
+									style="background: linear-gradient(90deg, var(--rust-deep), var(--brand) 55%, var(--green)); opacity: 0.85;"
+								>
+									<span
+										class="absolute -top-0.5 w-2 h-2 rounded-full"
+										style="left: calc({(((p.pearson_on_shared + 1) / 2) * 100).toFixed(1)}% - 4px); background: var(--ink); box-shadow: 0 0 6px rgba(215, 196, 131, 0.8);"
+									></span>
+								</div>
+							{/if}
 						</div>
 						<div class="flex gap-4 items-center">
 							<div class="text-right">
@@ -249,7 +262,7 @@
 					{#each report.consensus_movies as m, i (m.movie_id)}
 						<li
 							class="flex items-baseline gap-3 py-1.5 px-2 rounded-md"
-							style="background: rgba(0,0,0,0.15);"
+							style="background: rgba(12, 11, 9, 0.3);"
 							in:fly={{ y: 4, delay: i * 30, duration: 280 }}
 						>
 							<span class="text-[11px] tabular-nums mono" style="color: var(--ink-faint);">
@@ -261,7 +274,7 @@
 									{Object.entries(m.member_ratings).map(([n, r]) => `${n} ${r}★`).join(' · ')}
 								</div>
 							</div>
-							<span class="mono text-xs" style="color: #6ee7b7;">
+							<span class="mono text-xs" style="color: var(--green);">
 								{m.mean.toFixed(1)}★
 							</span>
 						</li>
@@ -290,7 +303,7 @@
 					{#each report.disagreement_movies as m, i (m.movie_id)}
 						<li
 							class="flex items-baseline gap-3 py-1.5 px-2 rounded-md"
-							style="background: rgba(0,0,0,0.15);"
+							style="background: rgba(12, 11, 9, 0.3);"
 							in:fly={{ y: 4, delay: i * 30, duration: 280 }}
 						>
 							<span class="text-[11px] tabular-nums mono" style="color: var(--ink-faint);">
@@ -302,7 +315,7 @@
 									{Object.entries(m.member_ratings).map(([n, r]) => `${n} ${r}★`).join(' · ')}
 								</div>
 							</div>
-							<span class="mono text-xs" style="color: #fca5a5;">
+							<span class="mono text-xs" style="color: var(--rust);">
 								σ {m.std.toFixed(1)}
 							</span>
 						</li>

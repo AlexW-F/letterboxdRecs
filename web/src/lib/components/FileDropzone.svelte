@@ -36,10 +36,10 @@
 <label
 	class="dropzone block rounded-lg border-2 border-dashed cursor-pointer transition px-4 py-5 text-center relative overflow-hidden"
 	style={file
-		? 'background: var(--brand-dim); border-color: rgba(52,211,153,0.55);'
+		? 'background: rgba(143, 175, 122, 0.1); border-color: rgba(143, 175, 122, 0.6);'
 		: dragging
-			? 'background: rgba(52,211,153,0.06); border-color: var(--brand);'
-			: 'background: rgba(0,0,0,0.2); border-color: var(--border);'}
+			? 'background: rgba(201, 165, 84, 0.07); border-color: var(--brand);'
+			: 'background: rgba(12, 11, 9, 0.3); border-color: var(--border);'}
 	ondragover={(e) => {
 		e.preventDefault();
 		dragging = true;
@@ -49,14 +49,14 @@
 >
 	<div class="flex items-center justify-center gap-2 mb-1">
 		{#if file}
-			<CheckCircle2 size={16} style="color: var(--brand);" />
+			<CheckCircle2 size={16} style="color: var(--green);" />
 		{:else}
 			<Upload size={16} style="color: var(--ink-dim);" />
 		{/if}
 		<div class="text-sm font-medium">{label}</div>
 	</div>
 	{#if file}
-		<div in:fly={{ y: -2, duration: 180 }} class="text-xs mono" style="color: #6ee7b7;">
+		<div in:fly={{ y: -2, duration: 180 }} class="text-xs mono" style="color: var(--green);">
 			{file.name}
 			<span style="color: var(--ink-dim);">· {(file.size / 1024).toFixed(0)} KB</span>
 		</div>
@@ -72,7 +72,7 @@
 
 <style>
 	.dropzone:focus-within {
-		outline: 2px solid rgba(52, 211, 153, 0.7);
+		outline: 2px solid rgba(201, 165, 84, 0.75);
 		outline-offset: 2px;
 	}
 </style>

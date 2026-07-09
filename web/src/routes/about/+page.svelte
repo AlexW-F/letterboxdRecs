@@ -40,7 +40,7 @@
 <section class="space-y-8 max-w-4xl anim-fade-up">
 	<header>
 		<span class="chip">about · methodology</span>
-		<h1 class="display-md mt-2" style="font-family: 'Playfair Display', Georgia, serif; font-style: italic;">
+		<h1 class="display-md mt-2">
 			How the picks <span class="text-gradient">happen</span>.
 		</h1>
 		<p class="text-sm" style="color: var(--ink-muted);">
@@ -57,7 +57,7 @@
 			<Stat label="content" value={health.content_loaded ? 'loaded' : '—'} hint="genome + overviews" />
 		</div>
 	{:else if error}
-		<p class="text-sm" style="color: #fca5a5;">{error}</p>
+		<p class="text-sm" style="color: var(--rust);">{error}</p>
 	{/if}
 
 	<div class="grid grid-cols-1 md:grid-cols-2 gap-3">

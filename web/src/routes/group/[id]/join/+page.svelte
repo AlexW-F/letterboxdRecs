@@ -147,7 +147,7 @@
 			<UsersIcon size={11} />
 			Shared group · {groupId}
 		</span>
-		<h1 class="display-md" style="font-family: 'Playfair Display', Georgia, serif; font-style: italic;">
+		<h1 class="display-md">
 			Join the group.
 		</h1>
 		<p class="text-sm" style="color: var(--ink-muted);">
@@ -157,7 +157,7 @@
 	</header>
 
 	{#if loadErr}
-		<div class="surface p-4 text-sm" style="background: var(--rose-dim); border-color: rgba(248,113,113,0.3); color: #fecaca;">
+		<div class="surface p-4 text-sm" style="background: var(--rose-dim); border-color: rgba(187, 119, 68, 0.4); color: #dda679;">
 			Could not load group <code>{groupId}</code>: {loadErr}
 		</div>
 	{:else if !group}
@@ -241,9 +241,9 @@
 		{#if joinedAs}
 			<div
 				class="surface p-4 flex items-center gap-3 flex-wrap anim-fade-up"
-				style="background: var(--brand-dim); border-color: rgba(52, 211, 153, 0.4);"
+				style="background: rgba(143, 175, 122, 0.1); border-color: rgba(143, 175, 122, 0.45);"
 			>
-				<CheckCircle2 size={18} style="color: #6ee7b7; flex-shrink: 0;" />
+				<CheckCircle2 size={18} style="color: var(--green); flex-shrink: 0;" />
 				<div class="flex-1 min-w-0 text-sm">
 					<strong>You're in as {joinedAs}.</strong>
 					{#if group.members.length >= 2}
@@ -296,7 +296,7 @@
 				>
 					<AtSign size={12} />
 					Letterboxd username
-					<span class="text-[10px] mono ml-1" style="color: #fca5a5;">~50 only</span>
+					<span class="text-[10px] mono ml-1" style="color: var(--rust);">~50 only</span>
 				</button>
 			</div>
 
@@ -305,7 +305,7 @@
 					<div class="flex items-stretch gap-0">
 						<span
 							class="inline-flex items-center px-3 rounded-l-md mono text-sm"
-							style="background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-right: none; color: var(--ink-faint);"
+							style="background: rgba(215, 196, 131, 0.05); border: 1px solid var(--border); border-right: none; color: var(--ink-faint);"
 						>
 							letterboxd.com/
 						</span>
@@ -330,7 +330,7 @@
 					/>
 					<div
 						class="text-[11px] rounded-md px-3 py-2 leading-relaxed flex items-start gap-2"
-						style="background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.3); color: #fecaca;"
+						style="background: rgba(187, 119, 68, 0.1); border: 1px solid rgba(187, 119, 68, 0.4); color: #dda679;"
 					>
 						<Rss size={12} style="flex-shrink: 0; margin-top: 1px;" />
 						<div>
@@ -353,7 +353,7 @@
 				<FileDropzone label="watchlist.csv (optional)" hint="powers shared-watchlist overlap" bind:file={watchlistFile} />
 				<div
 					class="text-[11px] rounded-md px-3 py-2 leading-relaxed"
-					style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); color: var(--ink-muted);"
+					style="background: rgba(215, 196, 131, 0.04); border: 1px solid var(--border); color: var(--ink-muted);"
 				>
 					<div class="font-medium" style="color: var(--ink-dim);">Where to find your CSVs</div>
 					<div class="mt-1">
@@ -375,7 +375,7 @@
 			{/if}
 
 			{#if error}
-				<p class="text-sm rounded-md px-3 py-2" style="background: var(--rose-dim); border: 1px solid rgba(248,113,113,0.3); color: #fecaca;">
+				<p class="text-sm rounded-md px-3 py-2" style="background: var(--rose-dim); border: 1px solid rgba(187, 119, 68, 0.4); color: #dda679;">
 					{error}
 				</p>
 			{/if}
